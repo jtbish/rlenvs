@@ -110,8 +110,8 @@ class MountainCarABC(EnvironmentABC, metaclass=abc.ABCMeta):
     def _gen_custom_obs_space(self):
         obs_space_builder = ObsSpaceBuilder()
         # order of dims is [pos, vel]
-        obs_space_builder.add_dim(Dimension(_POS_LOWER, _POS_UPPER))
-        obs_space_builder.add_dim(Dimension(_VEL_LOWER, _VEL_UPPER))
+        obs_space_builder.add_dim(Dimension(_POS_LOWER, _POS_UPPER, "pos"))
+        obs_space_builder.add_dim(Dimension(_VEL_LOWER, _VEL_UPPER, "vel"))
         return obs_space_builder.create_space()
 
     def reset(self):

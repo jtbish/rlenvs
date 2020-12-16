@@ -114,10 +114,14 @@ class CartpoleABC(EnvironmentABC, metaclass=abc.ABCMeta):
     def _gen_custom_obs_space(self):
         obs_space_builder = ObsSpaceBuilder()
         # order of dims is [cart_pos, cart_vel, pole_ang, pole_vel]
-        obs_space_builder.add_dim(Dimension(_CART_POS_LOWER, _CART_POS_UPPER))
-        obs_space_builder.add_dim(Dimension(_CART_VEL_LOWER, _CART_VEL_UPPER))
-        obs_space_builder.add_dim(Dimension(_POLE_ANG_LOWER, _POLE_ANG_UPPER))
-        obs_space_builder.add_dim(Dimension(_POLE_VEL_LOWER, _POLE_VEL_UPPER))
+        obs_space_builder.add_dim(Dimension(_CART_POS_LOWER, _CART_POS_UPPER,
+                                  "cart_pos"))
+        obs_space_builder.add_dim(Dimension(_CART_VEL_LOWER, _CART_VEL_UPPER,
+                                  "cart_vel"))
+        obs_space_builder.add_dim(Dimension(_POLE_ANG_LOWER, _POLE_ANG_UPPER,
+                                  "pole_ang"))
+        obs_space_builder.add_dim(Dimension(_POLE_VEL_LOWER, _POLE_VEL_UPPER,
+                                  "pole_vel"))
         return obs_space_builder.create_space()
 
     def reset(self):
