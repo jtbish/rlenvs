@@ -8,18 +8,8 @@ from .environment import EnvironmentABC
 from .obs_space import ObsSpaceBuilder
 
 _GYM_ENV_NAME = "CartPole-v0"
-# These were found via the following procedure:
-# Run 1 million trials on raw env only picking left action, recording all
-# observations
-# Run 1 million trials on raw env only picking right action, recording all
-# observations
-# From both arrays of observations collected (left and right arrays), calc the
-# minimum and maximum values of the cart vel and pole vel features.
-# Since ran experiment for so long, the min and max values were almost
-# symmetrical around zero.
-# Finally take these values and multiply them by a leniency factor of 1.05
-_MAX_CART_VEL = 2.1975
-_MAX_POLE_VEL = 3.3365
+_MAX_CART_VEL = 2.5
+_MAX_POLE_VEL = 3.5
 _CART_VEL_LOWER = -(_MAX_CART_VEL)
 _CART_VEL_UPPER = _MAX_CART_VEL
 _POLE_VEL_LOWER = -(_MAX_POLE_VEL)
