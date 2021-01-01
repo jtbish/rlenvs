@@ -143,36 +143,30 @@ class MountainCarVariantA(MountainCarABC):
 
 
 class MountainCarVariantB(MountainCarABC):
-    """Uniform pos zero vel init obs distribution."""
-    # TODO
-    _MIN_PERF = None
-    _MAX_PERF = None
+    _MIN_PERF = -200
+    _MAX_PERF = -75
 
     @property
     def returns_agg_func(self):
-        return sum
+        return np.mean
 
     def _gen_init_obs(self):
-        pos_dim = self._obs_space[0]
-        pos = self._rng.uniform(low=pos_dim.lower, high=pos_dim.upper)
+        pos = self._rng.uniform(low=-1.0, high=0.0)
         vel = 0.0
         obs = np.asarray([pos, vel])
         return obs
 
 
 class MountainCarVariantC(MountainCarABC):
-    """Uniform both init obs distribution."""
-    # TODO
-    _MIN_PERF = None
-    _MAX_PERF = None
+    _MIN_PERF = -200
+    _MAX_PERF = -75
 
     @property
     def returns_agg_func(self):
-        return sum
+        return np.mean
 
     def _gen_init_obs(self):
-        obs = []
-        for dimension in self._obs_space:
-            obs.append(
-                self._rng.uniform(low=dimension.lower, high=dimension.upper))
-        return np.asarray(obs)
+        pos = self._rng.uniform(low=-1.0, high=0.0)
+        vel = self._rng.uniform(low=-0.03, high=0.03)
+        obs = np.asarray([pos, vel])
+        return obs
