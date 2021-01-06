@@ -106,7 +106,9 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def reset(self):
         self._is_terminal = False
         wrapped_obs = self._wrapped_env.reset()
-        return self._enforce_valid_obs(wrapped_obs)
+        wrapped_obs_valid = self._enforce_valid_obs(wrapped_obs)
+        self._inject_obs_into_wrapped_env(wrapped_obs_valid)
+        return wrapped_obs_valid
 
     def _enforce_valid_obs(self, obs):
         obs = np.atleast_1d(obs)
@@ -133,12 +135,22 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
 
     def _step(self, action):
         assert action in self._action_set, f"{action}, {self._action_set}"
+        # do the transition using wrapped env
         wrapped_obs, wrapped_reward, wrapped_done, wrapped_info = \
             self._wrapped_env.step(action)
+        # respect the terminal flag given by wrapped env, but enforce that
+        # state of wrapped env is within obs space bounds via
+        # injecting it back in after being (possibly) truncated
         self._is_terminal = wrapped_done
-        return EnvironmentResponse(obs=self._enforce_valid_obs(wrapped_obs),
+        wrapped_obs_valid = self._enforce_valid_obs(wrapped_obs)
+        self._inject_obs_into_wrapped_env(wrapped_obs_valid)
+
+        return EnvironmentResponse(obs=wrapped_obs_valid,
                                    reward=wrapped_reward,
                                    is_terminal=self._is_terminal)
+
+    def _inject_obs_into_wrapped_env(self, obs):
+        self._wrapped_env.unwrapped.state = obs
 
     def is_terminal(self):
         return self._is_terminal

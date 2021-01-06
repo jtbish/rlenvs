@@ -121,8 +121,7 @@ class MountainCarABC(EnvironmentABC, metaclass=abc.ABCMeta):
         super().reset()
         obs = self._gen_init_obs()
         obs = self._enforce_valid_obs(obs)
-        # inject generated obs into the wrapped gym env
-        self._wrapped_env.unwrapped.state = obs
+        self._inject_obs_into_wrapped_env(obs)
         return obs
 
 

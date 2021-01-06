@@ -8,7 +8,7 @@ from .environment import EnvironmentABC
 from .obs_space import ObsSpaceBuilder
 
 _GYM_ENV_NAME = "CartPole-v0"
-_MAX_CART_VEL = 2.5
+_MAX_CART_VEL = 2.25
 _MAX_POLE_VEL = 3.5
 _CART_VEL_LOWER = -(_MAX_CART_VEL)
 _CART_VEL_UPPER = _MAX_CART_VEL
@@ -121,8 +121,7 @@ class CartpoleABC(EnvironmentABC, metaclass=abc.ABCMeta):
         super().reset()
         obs = self._gen_init_obs()
         obs = self._enforce_valid_obs(obs)
-        # inject generated obs into the wrapped gym env
-        self._wrapped_env.unwrapped.state = obs
+        self._inject_obs_into_wrapped_env(obs)
         return obs
 
 
