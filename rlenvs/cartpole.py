@@ -30,6 +30,10 @@ def make_cartpole_a_env():
     return CartpoleVariantA()
 
 
+def make_cartpole_b_env():
+    return CartpoleVariantB()
+
+
 def _assess_cartpole_env_perf(env, policy, returns_agg_func, return_trajs):
     """Common cartpole perf. assessment function.
 
@@ -136,3 +140,19 @@ class CartpoleVariantA(CartpoleABC):
 
     def _gen_init_obs(self):
         return np.asarray(self._rng.uniform(low=-0.05, high=0.05, size=4))
+
+
+class CartpoleVariantB(CartpoleABC):
+    _MIN_PERF = 0
+    _MAX_PERF = 200
+
+    @property
+    def returns_agg_func(self):
+        return np.mean
+
+    def _gen_init_obs(self):
+        cart_pos = self._rng.uniform(low=-1.056, high=1.056)
+        cart_vel = self._rng.uniform(low=-0.99, high=0.99)
+        pole_ang = self._rng.uniform(low=-0.092, high=0.092)
+        pole_vel = self._rng.uniform(low=-1.54, high=1.54)
+        return np.asarray([cart_pos, cart_vel, pole_ang, pole_vel])
