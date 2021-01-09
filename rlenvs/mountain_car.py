@@ -30,10 +30,6 @@ def make_mountain_car_b_env():
     return MountainCarVariantB()
 
 
-def make_mountain_car_c_env():
-    return MountainCarVariantC()
-
-
 def _assess_mountain_car_env_perf(env, policy, returns_agg_func,
                                   return_trajs):
     """Common MC perf. assessment function.
@@ -150,22 +146,7 @@ class MountainCarVariantB(MountainCarABC):
         return np.mean
 
     def _gen_init_obs(self):
-        pos = self._rng.uniform(low=-1.0, high=0.0)
-        vel = 0.0
-        obs = np.asarray([pos, vel])
-        return obs
-
-
-class MountainCarVariantC(MountainCarABC):
-    _MIN_PERF = -200
-    _MAX_PERF = -75
-
-    @property
-    def returns_agg_func(self):
-        return np.mean
-
-    def _gen_init_obs(self):
-        pos = self._rng.uniform(low=-1.0, high=0.0)
-        vel = self._rng.uniform(low=-0.03, high=0.03)
+        pos = self._rng.uniform(low=-0.9, high=-0.1)
+        vel = self._rng.uniform(low=-0.035, high=0.035)
         obs = np.asarray([pos, vel])
         return obs
