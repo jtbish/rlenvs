@@ -143,6 +143,8 @@ class CartpoleVariantA(CartpoleABC):
 
 
 class CartpoleVariantB(CartpoleABC):
+    """Init obs within hyperrectangle where it is possible to achieve perf. of
+    200."""
     _MIN_PERF = 0
     _MAX_PERF = 200
 
@@ -151,8 +153,8 @@ class CartpoleVariantB(CartpoleABC):
         return np.mean
 
     def _gen_init_obs(self):
-        cart_pos = self._rng.uniform(low=-1.056, high=1.056)
-        cart_vel = self._rng.uniform(low=-0.99, high=0.99)
-        pole_ang = self._rng.uniform(low=-0.092, high=0.092)
-        pole_vel = self._rng.uniform(low=-1.54, high=1.54)
+        cart_pos = self._rng.uniform(low=-0.96, high=0.96)
+        cart_vel = self._rng.uniform(low=-0.9, high=0.9)
+        pole_ang = self._rng.uniform(low=-0.0838, high=0.0838)
+        pole_vel = self._rng.uniform(low=-1.4, high=1.4)
         return np.asarray([cart_pos, cart_vel, pole_ang, pole_vel])

@@ -138,15 +138,16 @@ class MountainCarVariantA(MountainCarABC):
 
 
 class MountainCarVariantB(MountainCarABC):
+    """Init obs dist. covers entire obs space."""
     _MIN_PERF = -200
-    _MAX_PERF = -75
+    _MAX_PERF = -50
 
     @property
     def returns_agg_func(self):
         return np.mean
 
     def _gen_init_obs(self):
-        pos = self._rng.uniform(low=-0.9, high=-0.1)
-        vel = self._rng.uniform(low=-0.035, high=0.035)
+        pos = self._rng.uniform(low=_POS_LOWER, high=_POS_UPPER)
+        vel = self._rng.uniform(low=_VEL_LOWER, high=_VEL_UPPER)
         obs = np.asarray([pos, vel])
         return obs
