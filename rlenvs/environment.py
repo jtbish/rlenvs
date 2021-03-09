@@ -82,7 +82,8 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def _gen_discrete_obs_space(self, wrapped_env):
         num_obss = wrapped_env.observation_space.n
         obs_space_builder = ObsSpaceBuilder()
-        obs_space_builder.add_dim(Dimension(lower=0, upper=(num_obss - 1)))
+        obs_space_builder.add_dim(Dimension(lower=0, upper=(num_obss - 1),
+                                  name="dim1"))
         return obs_space_builder.create_space()
 
     def _gen_continuous_obs_space(self, wrapped_env):
