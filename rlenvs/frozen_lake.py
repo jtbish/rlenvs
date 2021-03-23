@@ -2,13 +2,14 @@ import copy
 import math
 
 import numpy as np
-
 from gym.envs.registration import register
 from gym.envs.toy_text.frozen_lake import MAPS
 
 from .dimension import Dimension
-from .environment import EnvironmentResponse, EnvironmentABC
+from .environment import EnvironmentABC, EnvironmentResponse
 from .obs_space import ObsSpaceBuilder
+
+_PERF_LB = 0.0
 
 MAPS["16x16"] = \
     ["SFFFFHFFFFFFFFFF",
@@ -44,6 +45,8 @@ def make_frozen_lake_8x8_env(slip_prob=0.0, seed=0):
 def make_frozen_lake_16x16_env(slip_prob=0.0, seed=0):
     return FrozenLake16x16(slip_prob, seed)
 
+# TODO add in initial obs sampling here
+
 
 class FrozenLakeABC(EnvironmentABC):
     """Changes observations and observation space to be an (x, y) grid instead
@@ -53,7 +56,7 @@ class FrozenLakeABC(EnvironmentABC):
         super().__init__(env_name=self._GYM_ENV_NAME,
                          env_kwargs={"is_slippery": is_slippery},
                          custom_obs_space=None,
-                         custom_action_set=None,
+                         custom_action_space=None,
                          seed=seed)
         self._x_y_coordinates_obs_space = \
             self._gen_x_y_coordinates_obs_space(self._GRID_SIZE)
@@ -63,8 +66,9 @@ class FrozenLakeABC(EnvironmentABC):
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
         for name in ("x", "y"):
-            obs_space_builder.add_dim(Dimension(0, grid_size - 1, name))
-        return obs_space_builder.create_space()
+            obs_space_builder.add_dim(
+                Dimension(lower=0, upper=(grid_size - 1), name=name))
+        return obs_space_builder.create_integer_space()
 
     def _alter_transition_func_if_needed(self, slip_prob):
         if slip_prob > 0.0:
@@ -101,11 +105,16 @@ class FrozenLakeABC(EnvironmentABC):
         self._wrapped_env.unwrapped.P = P_mut
 
     @property
+    def perf_lower_bound(self):
+        return _PERF_LB
+
+    @property
     def obs_space(self):
         return self._x_y_coordinates_obs_space
 
     @property
     def P(self):
+        """Transition matrix."""
         return self._wrapped_env.P
 
     @property
@@ -119,9 +128,11 @@ class FrozenLakeABC(EnvironmentABC):
     @property
     def terminal_states(self):
         desc = self._wrapped_env.desc.flatten()
-        terminal_states = [self._convert_raw_obs_to_x_y_coordinates([idx]) for
-                           (idx, letter) in enumerate(desc) if letter == b'H'
-                           or letter == b'G']
+        terminal_states = [
+            self._convert_raw_obs_to_x_y_coordinates([idx])
+            for (idx, letter) in enumerate(desc)
+            if letter == b'H' or letter == b'G'
+        ]
         return terminal_states
 
     def reset(self):
@@ -154,17 +165,10 @@ class FrozenLake4x4(FrozenLakeABC):
     _GRID_SIZE = 4
 
     @property
-    def min_perf(self):
-        raise NotImplementedError
-
-    @property
-    def max_perf(self):
+    def perf_upper_bound(self):
         raise NotImplementedError
 
     def assess_perf(self, policy):
-        raise NotImplementedError
-
-    def assess_perf_and_get_trajs(self, policy):
         raise NotImplementedError
 
 
@@ -173,17 +177,10 @@ class FrozenLake8x8(FrozenLakeABC):
     _GRID_SIZE = 8
 
     @property
-    def min_perf(self):
-        raise NotImplementedError
-
-    @property
-    def max_perf(self):
+    def perf_upper_bound(self):
         raise NotImplementedError
 
     def assess_perf(self, policy):
-        raise NotImplementedError
-
-    def assess_perf_and_get_trajs(self, policy):
         raise NotImplementedError
 
 
@@ -192,15 +189,8 @@ class FrozenLake16x16(FrozenLakeABC):
     _GRID_SIZE = 16
 
     @property
-    def min_perf(self):
-        raise NotImplementedError
-
-    @property
-    def max_perf(self):
+    def perf_upper_bound(self):
         raise NotImplementedError
 
     def assess_perf(self, policy):
-        raise NotImplementedError
-
-    def assess_perf_and_get_trajs(self, policy):
         raise NotImplementedError
