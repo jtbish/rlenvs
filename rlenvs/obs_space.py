@@ -6,11 +6,11 @@ class ObsSpaceBase:
         return iter(self._dims)
 
 
-def IntegerObsSpace(ObsSpaceBase):
+class IntegerObsSpace(ObsSpaceBase):
     pass
 
 
-def RealObsSpace(ObsSpaceBase):
+class RealObsSpace(ObsSpaceBase):
     pass
 
 

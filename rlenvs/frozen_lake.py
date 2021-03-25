@@ -10,6 +10,10 @@ from .environment import EnvironmentABC, EnvironmentResponse
 from .obs_space import ObsSpaceBuilder
 
 _PERF_LB = 0.0
+_SLIP_PROB_MIN_INCL = 0.0
+_SLIP_PROB_MAX_EXCL = 1.0
+_IOD_STRATS = ("top_left", "uniform")
+_TOP_LEFT_OBS_RAW = 0
 
 MAPS["16x16"] = \
     ["SFFFFHFFFFFFFFFF",
@@ -34,34 +38,35 @@ register(id="FrozenLake16x16-v0",
          kwargs={"map_name": "16x16"})
 
 
-def make_frozen_lake_4x4_env(slip_prob=0.0, seed=0):
-    return FrozenLake4x4(slip_prob, seed)
-
-
-def make_frozen_lake_8x8_env(slip_prob=0.0, seed=0):
-    return FrozenLake8x8(slip_prob, seed)
-
-
-def make_frozen_lake_16x16_env(slip_prob=0.0, seed=0):
-    return FrozenLake16x16(slip_prob, seed)
-
-# TODO add in initial obs sampling here
+def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=0):
+    assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
+    assert iod_strat in _IOD_STRATS
+    if grid_size == 4:
+        return FrozenLake4x4(slip_prob, iod_strat, seed)
+    elif grid_size == 8:
+        return FrozenLake8x8(slip_prob, iod_strat, seed)
+    elif grid_size == 16:
+        return FrozenLake16x16(slip_prob, iod_strat, seed)
+    else:
+        assert False
 
 
 class FrozenLakeABC(EnvironmentABC):
     """Changes observations and observation space to be an (x, y) grid instead
     of simple numbered array of cells."""
-    def __init__(self, slip_prob, seed):
+    def __init__(self, slip_prob, iod_strat, seed):
         is_slippery = slip_prob > 0.0
         super().__init__(env_name=self._GYM_ENV_NAME,
                          env_kwargs={"is_slippery": is_slippery},
                          custom_obs_space=None,
                          custom_action_space=None,
+                         time_limit=self._TIME_LIMIT,
                          seed=seed)
         self._x_y_coordinates_obs_space = \
             self._gen_x_y_coordinates_obs_space(self._GRID_SIZE)
         self._slip_prob = slip_prob
         self._alter_transition_func_if_needed(self._slip_prob)
+        self._iod_strat = iod_strat
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
@@ -107,6 +112,22 @@ class FrozenLakeABC(EnvironmentABC):
     @property
     def perf_lower_bound(self):
         return _PERF_LB
+
+    def _sample_initial_obs(self):
+        if self._iod_strat == "top_left":
+            return _TOP_LEFT_OBS_RAW
+        elif self._iod_strat == "uniform":
+            return self._uniform_random_initial_obs_raw()
+        else:
+            assert False
+
+    def _uniform_random_initial_obs_raw(self):
+        desc = self._wrapped_env.desc.flatten()
+        nonterminal_states = [
+            idx for (idx, letter) in enumerate(desc)
+            if letter == b'S' or letter == b'F'
+        ]
+        return self._iod_rng.choice(nonterminal_states)
 
     @property
     def obs_space(self):
@@ -163,34 +184,16 @@ class FrozenLakeABC(EnvironmentABC):
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
-
-    @property
-    def perf_upper_bound(self):
-        raise NotImplementedError
-
-    def assess_perf(self, policy):
-        raise NotImplementedError
+    _TIME_LIMIT = None
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
-
-    @property
-    def perf_upper_bound(self):
-        raise NotImplementedError
-
-    def assess_perf(self, policy):
-        raise NotImplementedError
+    _TIME_LIMIT = None
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
-
-    @property
-    def perf_upper_bound(self):
-        raise NotImplementedError
-
-    def assess_perf(self, policy):
-        raise NotImplementedError
+    _TIME_LIMIT = None

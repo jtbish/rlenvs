@@ -10,6 +10,11 @@ from .dimension import Dimension
 from .error import EndOfEpisodeError, InvalidSpecError
 from .obs_space import ObsSpaceBuilder
 
+_GAMMA_MIN = 0.0
+_GAMMA_MAX = 1.0
+_NUM_ROLLS_MIN = 1
+_TIME_LIMIT_MIN = 1
+
 EnvironmentResponse = namedtuple("EnvironmentResponse",
                                  ["obs", "reward", "is_terminal"])
 
@@ -24,27 +29,20 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
                  env_kwargs=None,
                  custom_obs_space=None,
                  custom_action_space=None,
+                 time_limit=None,
                  seed=0):
         self._wrapped_env = self._init_wrapped_env(env_name, env_kwargs, seed)
         self._obs_space = self._gen_obs_space_if_not_given(
             self._wrapped_env, custom_obs_space)
         self._action_space = self._gen_action_space_if_not_given(
             self._wrapped_env, custom_action_space)
+        self._set_wrapped_time_limit(time_limit)
+        self._iod_rng = self._make_iod_rng(seed)
         self._is_terminal = True
 
     @property
     @abc.abstractmethod
     def perf_lower_bound(self):
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def perf_upper_bound(self):
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def max_time_steps(self):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -108,11 +106,20 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         num_actions = wrapped_env.action_space.n
         return tuple(range(num_actions))
 
+    def _set_wrapped_time_limit(self, time_limit):
+        if time_limit is not None:
+            assert time_limit >= _TIME_LIMIT_MIN
+            self._wrapped_env._max_episode_steps = time_limit
+
+    def _make_iod_rng(self, seed):
+        """Initial Observation Distribution Random Number Generator."""
+        return np.random.RandomState(int(seed))
+
     def reset(self):
         self._is_terminal = False
         # reset internals in wrapped env
         self._wrapped_env.reset()
-        # then gen an initial obs and inject it into wrapped env
+        # then gen an initial obs, validate it, and inject it into wrapped env
         initial_obs = self._sample_initial_obs()
         initial_obs_valid = self._enforce_valid_obs(initial_obs)
         self._inject_obs_into_wrapped_env(initial_obs_valid)
@@ -128,8 +135,7 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         space."""
         truncated_obs = []
         for (feature_val, dim) in zip(obs, self._obs_space):
-            feature_val = max(feature_val, dim.lower)
-            feature_val = min(feature_val, dim.upper)
+            feature_val = np.clip(feature_val, dim.lower, dim.upper)
             truncated_obs.append(feature_val)
         return np.asarray(truncated_obs)
 
@@ -166,31 +172,29 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def render(self):
         self._wrapped_env.render()
 
-    def assess_perf(self,
-                    policy,
-                    num_rollouts,
-                    gamma,
-                    returns_agg_func=np.mean):
-        assert 0.0 <= gamma <= 1.0
-        env = copy.deepcopy(self)
-        return _common_env_perf_assessment(env, policy, num_rollouts, gamma,
-                                           returns_agg_func)
+
+def assess_perf(env, policy, num_rollouts, gamma, returns_agg_func=np.mean):
+    assert _GAMMA_MIN <= gamma <= _GAMMA_MAX
+    assert num_rollouts >= _NUM_ROLLS_MIN
+    # make copy of env for perf assessment so rng state is not modified
+    # across assessments
+    env = copy.deepcopy(env)
+    return _assess_perf(env, policy, num_rollouts, gamma, returns_agg_func)
 
 
-def _common_env_perf_assessment(env, policy, num_rollouts, gamma,
-                                returns_agg_func):
+def _assess_perf(env, policy, num_rollouts, gamma, returns_agg_func):
     returns = []
     for _ in range(num_rollouts):
         obs = env.reset()
         return_ = 0.0
         time_step = 0
         while True:
-            action = policy.choose_action(obs)
+            action = policy.select_action(obs)
             env_response = env.step(action)
             obs = env_response.obs
             return_ += ((gamma**time_step) * env_response.reward)
             time_step += 1
-            if (env_response.is_terminal or time_step == env.max_time_steps):
+            if env_response.is_terminal:
                 break
         returns.append(return_)
     perf = returns_agg_func(returns)
