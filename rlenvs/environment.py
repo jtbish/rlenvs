@@ -22,7 +22,7 @@ EnvironmentResponse = namedtuple("EnvironmentResponse",
 class EnvironmentABC(metaclass=abc.ABCMeta):
     """Wrapper over an OpenAI Gym environment to make interface nicer.
 
-    Supports discrete / continuous obs space, discrete action space.
+    Supports integer / real obs space, integer action space.
     Supports giving custom obs space / action space."""
     def __init__(self,
                  env_name,
