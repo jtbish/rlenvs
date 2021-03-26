@@ -5,6 +5,9 @@ class ObsSpaceBase:
     def __iter__(self):
         return iter(self._dims)
 
+    def __len__(self):
+        return len(self._dims)
+
 
 class IntegerObsSpace(ObsSpaceBase):
     pass
