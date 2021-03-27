@@ -5,6 +5,7 @@ from collections import namedtuple
 import gym
 import numpy as np
 from gym.spaces import Box, Discrete
+from gym.wrappers import TimeLimit
 
 from .dimension import Dimension
 from .error import EndOfEpisodeError, InvalidSpecError
@@ -13,7 +14,7 @@ from .obs_space import ObsSpaceBuilder
 _GAMMA_MIN = 0.0
 _GAMMA_MAX = 1.0
 _NUM_ROLLS_MIN = 1
-_TIME_LIMIT_MIN = 1
+TIME_LIMIT_MIN = 1
 
 EnvironmentResponse = namedtuple("EnvironmentResponse",
                                  ["obs", "reward", "is_terminal"])
@@ -26,17 +27,18 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     Supports giving custom obs space / action space."""
     def __init__(self,
                  env_name,
+                 time_limit,
                  env_kwargs=None,
                  custom_obs_space=None,
                  custom_action_space=None,
-                 time_limit=None,
                  seed=0):
         self._wrapped_env = self._init_wrapped_env(env_name, env_kwargs, seed)
+        self._set_wrapped_time_limit(time_limit)
+        self._time_limit = time_limit
         self._obs_space = self._gen_obs_space_if_not_given(
             self._wrapped_env, custom_obs_space)
         self._action_space = self._gen_action_space_if_not_given(
             self._wrapped_env, custom_action_space)
-        self._set_wrapped_time_limit(time_limit)
         self._iod_rng = self._make_iod_rng(seed)
         self._is_terminal = True
 
@@ -48,6 +50,10 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def _sample_initial_obs(self):
         raise NotImplementedError
+
+    @property
+    def time_limit(self):
+        return self._time_limit
 
     @property
     def obs_space(self):
@@ -63,6 +69,12 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         wrapped_env = gym.make(env_name, **env_kwargs)
         wrapped_env.seed(seed)
         return wrapped_env
+
+    def _set_wrapped_time_limit(self, time_limit):
+        assert isinstance(self._wrapped_env, TimeLimit)
+        assert time_limit is not None
+        assert time_limit >= TIME_LIMIT_MIN
+        self._wrapped_env._max_episode_steps = time_limit
 
     def _gen_obs_space_if_not_given(self, wrapped_env, custom_obs_space):
         if custom_obs_space is None:
@@ -105,11 +117,6 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def _gen_action_space(self, wrapped_env):
         num_actions = wrapped_env.action_space.n
         return tuple(range(num_actions))
-
-    def _set_wrapped_time_limit(self, time_limit):
-        if time_limit is not None:
-            assert time_limit >= _TIME_LIMIT_MIN
-            self._wrapped_env._max_episode_steps = time_limit
 
     def _make_iod_rng(self, seed):
         """Initial Observation Distribution Random Number Generator."""

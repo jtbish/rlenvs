@@ -6,7 +6,7 @@ from gym.envs.registration import register
 from gym.envs.toy_text.frozen_lake import MAPS
 
 from .dimension import Dimension
-from .environment import EnvironmentABC, EnvironmentResponse
+from .environment import TIME_LIMIT_MIN, EnvironmentABC, EnvironmentResponse
 from .obs_space import ObsSpaceBuilder
 
 _PERF_LB = 0.0
@@ -14,8 +14,10 @@ _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
 _IOD_STRATS = ("top_left", "uniform")
 _TOP_LEFT_OBS_RAW = 0
+_DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
+_TIME_LIMIT_MULT = 5
 
-MAPS["16x16"] = \
+MAPS["16x16-old"] = \
     ["SFFFFHFFFFFFFFFF",
      "FFFHHFFHHFFFFFFF",
      "FHHFFHFFFFFHFFFF",
@@ -33,22 +35,42 @@ MAPS["16x16"] = \
      "FFFFFFFFFFFFHHFF",
      "FFHFHFFFFFFFHHFG"]
 
+MAPS["16x16"] = \
+    ["SFFFFHFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFHFHFFF",
+     "FFFFFFFFFFFFFFFF",
+     "HFFFHFFFFFFFFFFF",
+     "FFFFFFFFFFHFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFHFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFFFFFFF",
+     "FFFFFFFFFFHFHFFF",
+     "FFFFFFFHFFFFFFFG"]
+
 register(id="FrozenLake16x16-v0",
          entry_point="gym.envs.toy_text:FrozenLakeEnv",
-         kwargs={"map_name": "16x16"})
+         kwargs={"map_name": "16x16"},
+         max_episode_steps=_DUMMY_MAX_EP_STEPS)
 
 
 def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=0):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
     if grid_size == 4:
-        return FrozenLake4x4(slip_prob, iod_strat, seed)
+        cls = FrozenLake4x4
     elif grid_size == 8:
-        return FrozenLake8x8(slip_prob, iod_strat, seed)
+        cls = FrozenLake8x8
     elif grid_size == 16:
-        return FrozenLake16x16(slip_prob, iod_strat, seed)
+        cls = FrozenLake16x16
     else:
         assert False
+    return cls(slip_prob, iod_strat, seed)
 
 
 class FrozenLakeABC(EnvironmentABC):
@@ -56,11 +78,12 @@ class FrozenLakeABC(EnvironmentABC):
     of simple numbered array of cells."""
     def __init__(self, slip_prob, iod_strat, seed):
         is_slippery = slip_prob > 0.0
+        time_limit = 2 * self._GRID_SIZE * _TIME_LIMIT_MULT
         super().__init__(env_name=self._GYM_ENV_NAME,
+                         time_limit=time_limit,
                          env_kwargs={"is_slippery": is_slippery},
                          custom_obs_space=None,
                          custom_action_space=None,
-                         time_limit=self._TIME_LIMIT,
                          seed=seed)
         self._x_y_coordinates_obs_space = \
             self._gen_x_y_coordinates_obs_space(self._GRID_SIZE)
@@ -184,16 +207,13 @@ class FrozenLakeABC(EnvironmentABC):
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
-    _TIME_LIMIT = None
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
-    _TIME_LIMIT = None
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
-    _TIME_LIMIT = None

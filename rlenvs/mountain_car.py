@@ -27,9 +27,9 @@ class MountainCar(EnvironmentABC):
     def __init__(self, iod_strat, seed):
         custom_obs_space = self._gen_custom_obs_space()
         super().__init__(env_name=_GYM_ENV_NAME,
+                         time_limit=_TIME_LIMIT,
                          custom_obs_space=custom_obs_space,
                          custom_action_space=_CUSTOM_ACTION_SPACE,
-                         time_limit=_TIME_LIMIT,
                          seed=seed)
         self._iod_strat = iod_strat
 
