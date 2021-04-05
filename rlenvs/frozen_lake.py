@@ -55,7 +55,7 @@ MAPS["16x16"] = \
 
 register(id="FrozenLake16x16-v0",
          entry_point="gym.envs.toy_text:FrozenLakeEnv",
-         kwargs={"map_name": "16x16"},
+         kwargs={"map_name": "16x16-old"},
          max_episode_steps=_DUMMY_MAX_EP_STEPS)
 
 
@@ -188,11 +188,10 @@ class FrozenLakeABC(EnvironmentABC):
         # left, and flattening is done left to right, top to bottom.
         # x is the column coordinate, y is the row coordinate, both starting
         # from 0.
-        assert len(raw_obs) == 1
-        obs_val = raw_obs[0]
-        x = obs_val % self._GRID_SIZE
-        y = math.floor(obs_val / self._GRID_SIZE)
-        assert (y * self._GRID_SIZE + x) == obs_val
+        assert np.isscalar(raw_obs)
+        x = raw_obs % self._GRID_SIZE
+        y = math.floor(raw_obs / self._GRID_SIZE)
+        assert (y * self._GRID_SIZE + x) == raw_obs
         return np.asarray([x, y])
 
     def step(self, action):

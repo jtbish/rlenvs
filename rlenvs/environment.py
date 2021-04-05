@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import gym
 import numpy as np
+from gym.envs.toy_text.discrete import DiscreteEnv
 from gym.spaces import Box, Discrete
 from gym.wrappers import TimeLimit
 
@@ -126,25 +127,24 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         self._is_terminal = False
         # reset internals in wrapped env
         self._wrapped_env.reset()
-        # then gen an initial obs, validate it, and inject it into wrapped env
+        # then gen an initial obs and inject it into wrapped env
         initial_obs = self._sample_initial_obs()
-        initial_obs_valid = self._enforce_valid_obs(initial_obs)
-        self._inject_obs_into_wrapped_env(initial_obs_valid)
-        return initial_obs_valid
-
-    def _enforce_valid_obs(self, obs):
-        obs = np.atleast_1d(obs)
-        obs = self._truncate_obs(obs)
-        return obs
+        self._inject_obs_into_wrapped_env(initial_obs)
+        return initial_obs
 
     def _truncate_obs(self, obs):
         """Necessary to enforce observations are in (possibly) custom obs
         space."""
-        truncated_obs = []
-        for (feature_val, dim) in zip(obs, self._obs_space):
-            feature_val = np.clip(feature_val, dim.lower, dim.upper)
-            truncated_obs.append(feature_val)
-        return np.asarray(truncated_obs)
+        if np.isscalar(obs):
+            assert len(self._obs_space) == 1
+            dim = self._obs_space.dims[0]
+            return np.clip(obs, dim.lower, dim.upper)
+        else:
+            truncated_obs = []
+            for (feature_val, dim) in zip(obs, self._obs_space):
+                feature_val = np.clip(feature_val, dim.lower, dim.upper)
+                truncated_obs.append(feature_val)
+            return np.asarray(truncated_obs)
 
     def step(self, action):
         if self.is_terminal():
@@ -163,15 +163,20 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         # state of wrapped env is within obs space bounds via
         # injecting it back in after being (possibly) truncated
         self._is_terminal = wrapped_done
-        wrapped_obs_valid = self._enforce_valid_obs(wrapped_obs)
-        self._inject_obs_into_wrapped_env(wrapped_obs_valid)
+        wrapped_obs_trunc = self._truncate_obs(wrapped_obs)
+        self._inject_obs_into_wrapped_env(wrapped_obs_trunc)
 
-        return EnvironmentResponse(obs=wrapped_obs_valid,
+        return EnvironmentResponse(obs=wrapped_obs_trunc,
                                    reward=wrapped_reward,
                                    is_terminal=self._is_terminal)
 
     def _inject_obs_into_wrapped_env(self, obs):
-        self._wrapped_env.unwrapped.state = obs
+        unwrapped_env = self._wrapped_env.unwrapped
+        if isinstance(unwrapped_env, DiscreteEnv):
+            assert np.isscalar(obs)
+            unwrapped_env.s = obs
+        else:
+            unwrapped_env.state = obs
 
     def is_terminal(self):
         return self._is_terminal

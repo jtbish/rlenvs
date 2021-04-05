@@ -2,6 +2,10 @@ class ObsSpaceBase:
     def __init__(self, dims):
         self._dims = tuple(dims)
 
+    @property
+    def dims(self):
+        return self._dims
+
     def __iter__(self):
         return iter(self._dims)
 

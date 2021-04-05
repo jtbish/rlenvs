@@ -3,6 +3,7 @@ import numpy as np
 from .dimension import Dimension
 from .environment import EnvironmentABC
 from .obs_space import ObsSpaceBuilder
+from .normalise import NormaliseWrapper
 
 _GYM_ENV_NAME = "MountainCar-v0"
 _POS_LOWER = -1.2
@@ -18,9 +19,15 @@ _IOD_STRATS = ("bottom_zero_vel", "uniform")
 _TIME_LIMIT = 200
 
 
-def make_mountain_car_env(iod_strat, seed=0):
+def make_mountain_car_env(iod_strat="bottom_zero_vel",
+                          normalise=False,
+                          seed=0):
     assert iod_strat in _IOD_STRATS
-    return MountainCar(iod_strat, seed)
+    mc = MountainCar(iod_strat, seed)
+    if normalise:
+        return NormaliseWrapper(mc)
+    else:
+        return mc
 
 
 class MountainCar(EnvironmentABC):
