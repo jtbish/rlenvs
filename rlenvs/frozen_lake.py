@@ -12,8 +12,9 @@ from .obs_space import ObsSpaceBuilder
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
-_IOD_STRATS = ("top_left", "uniform")
+_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat")
 _TOP_LEFT_OBS_RAW = 0
+# used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
 _TIME_LIMIT_MULT = 5
 
@@ -78,7 +79,8 @@ class FrozenLakeABC(EnvironmentABC):
     of simple numbered array of cells."""
     def __init__(self, slip_prob, iod_strat, seed):
         is_slippery = slip_prob > 0.0
-        time_limit = 2 * self._GRID_SIZE * _TIME_LIMIT_MULT
+        # c*(2n-2), c = tl mult, n = grid size
+        time_limit = _TIME_LIMIT_MULT * (2 * self._GRID_SIZE - 2)
         super().__init__(env_name=self._GYM_ENV_NAME,
                          time_limit=time_limit,
                          env_kwargs={"is_slippery": is_slippery},
@@ -90,6 +92,7 @@ class FrozenLakeABC(EnvironmentABC):
         self._slip_prob = slip_prob
         self._alter_transition_func_if_needed(self._slip_prob)
         self._iod_strat = iod_strat
+        self._frozen_cycler = self._make_frozen_raw_state_cycler()
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
@@ -132,6 +135,17 @@ class FrozenLakeABC(EnvironmentABC):
                 P_mut[state][action] = P_cell_mut
         self._wrapped_env.unwrapped.P = P_mut
 
+    def _make_frozen_raw_state_cycler(self):
+        return iter(self._get_nonterminal_states_raw())
+
+    def _get_nonterminal_states_raw(self):
+        desc = self._wrapped_env.desc.flatten()
+        nonterminal_states_raw = [
+            idx for (idx, letter) in enumerate(desc)
+            if letter == b'S' or letter == b'F'
+        ]
+        return nonterminal_states_raw
+
     @property
     def perf_lower_bound(self):
         return _PERF_LB
@@ -139,18 +153,15 @@ class FrozenLakeABC(EnvironmentABC):
     def _sample_initial_obs(self):
         if self._iod_strat == "top_left":
             return _TOP_LEFT_OBS_RAW
-        elif self._iod_strat == "uniform":
+        elif self._iod_strat == "uniform_rand":
             return self._uniform_random_initial_obs_raw()
+        elif self._iod_strat == "frozen_no_repeat":
+            return next(self._frozen_cycler)
         else:
             assert False
 
     def _uniform_random_initial_obs_raw(self):
-        desc = self._wrapped_env.desc.flatten()
-        nonterminal_states = [
-            idx for (idx, letter) in enumerate(desc)
-            if letter == b'S' or letter == b'F'
-        ]
-        return self._iod_rng.choice(nonterminal_states)
+        return self._iod_rng.choice(self._get_nonterminal_states_raw())
 
     @property
     def obs_space(self):
@@ -173,11 +184,21 @@ class FrozenLakeABC(EnvironmentABC):
     def terminal_states(self):
         desc = self._wrapped_env.desc.flatten()
         terminal_states = [
-            self._convert_raw_obs_to_x_y_coordinates([idx])
+            self._convert_raw_obs_to_x_y_coordinates(idx)
             for (idx, letter) in enumerate(desc)
             if letter == b'H' or letter == b'G'
         ]
         return terminal_states
+
+    @property
+    def nonterminal_states(self):
+        desc = self._wrapped_env.desc.flatten()
+        nonterminal_states = [
+            self._convert_raw_obs_to_x_y_coordinates(idx)
+            for (idx, letter) in enumerate(desc)
+            if letter == b'S' or letter == b'F'
+        ]
+        return nonterminal_states
 
     def reset(self):
         raw_obs = super().reset()

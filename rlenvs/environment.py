@@ -14,7 +14,7 @@ from .obs_space import ObsSpaceBuilder
 
 _GAMMA_MIN = 0.0
 _GAMMA_MAX = 1.0
-_NUM_ROLLS_MIN = 1
+_NUM_ROLLOUTS_MIN = 1
 TIME_LIMIT_MIN = 1
 
 EnvironmentResponse = namedtuple("EnvironmentResponse",
@@ -185,16 +185,16 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         self._wrapped_env.render()
 
 
-def assess_perf(env, policy, num_rollouts, gamma, returns_agg_func=np.mean):
+def assess_perf(env, policy, num_rollouts, gamma):
     assert _GAMMA_MIN <= gamma <= _GAMMA_MAX
-    assert num_rollouts >= _NUM_ROLLS_MIN
+    assert num_rollouts >= _NUM_ROLLOUTS_MIN
     # make copy of env for perf assessment so rng state is not modified
     # across assessments
     env = copy.deepcopy(env)
-    return _assess_perf(env, policy, num_rollouts, gamma, returns_agg_func)
+    return _assess_perf(env, policy, num_rollouts, gamma)
 
 
-def _assess_perf(env, policy, num_rollouts, gamma, returns_agg_func):
+def _assess_perf(env, policy, num_rollouts, gamma):
     returns = []
     for _ in range(num_rollouts):
         obs = env.reset()
@@ -209,5 +209,4 @@ def _assess_perf(env, policy, num_rollouts, gamma, returns_agg_func):
             if env_response.is_terminal:
                 break
         returns.append(return_)
-    perf = returns_agg_func(returns)
-    return perf
+    return np.mean(returns)
