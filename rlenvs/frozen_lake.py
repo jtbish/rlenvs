@@ -12,51 +12,34 @@ from .obs_space import ObsSpaceBuilder
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
-_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat")
+_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat",
+               "frozen_plus_manhattan")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
-_TIME_LIMIT_MULT = 5
-
-MAPS["16x16-old"] = \
-    ["SFFFFHFFFFFFFFFF",
-     "FFFHHFFHHFFFFFFF",
-     "FHHFFHFFFFFHFFFF",
-     "FFFFFFFFFFFFFFHH",
-     "FFFFFFFFHFFHHHFH",
-     "FFFFFHHHFFFHFHHH",
-     "HFFFFHHFHFHHFFFF",
-     "HFHFFFHFHFFFFFFF",
-     "FFHFHFFFFFFFFHHF",
-     "FFFFFFHFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFHFFFFFFFHFFF",
-     "FHFFFFFFHHFHFFFH",
-     "FFFFFHFFFFFFFFFF",
-     "FFFFFFFFFFFFHHFF",
-     "FFHFHFFFFFFFHHFG"]
+_TIME_LIMIT_MULT = 4
 
 MAPS["16x16"] = \
-    ["SFFFFHFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFHFHFFF",
-     "FFFFFFFFFFFFFFFF",
-     "HFFFHFFFFFFFFFFF",
-     "FFFFFFFFFFHFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFHFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFFFFFFF",
-     "FFFFFFFFFFHFHFFF",
-     "FFFFFFFHFFFFFFFG"]
+    ["SFHFFFFHFHFFFFFF",
+     "FFFFFFFFFHFFHFFH",
+     "FFFFFFHFFHFFFHFH",
+     "FFFFHHFFHFFFFFFF",
+     "FFFFFFFHHFFHFFFF",
+     "FFFFFFFHHFHFHFFH",
+     "FHFFFHHFFFFFFFFF",
+     "FHFFHFFFFFFHHFFF",
+     "FFFFFFFFFFFFFFFH",
+     "FFFFFFFFFFHFHHFF",
+     "FFHHFHFFFFFFFFFF",
+     "FFFFHFFFFFFFFHFF",
+     "FFFHHHFFFHFFFFFH",
+     "FFFFHFFFFFFFFHFF",
+     "HFFFHFFHFHFFFHFF",
+     "FFFFHHFFFFFFFFHG"]
 
 register(id="FrozenLake16x16-v0",
          entry_point="gym.envs.toy_text:FrozenLakeEnv",
-         kwargs={"map_name": "16x16-old"},
+         kwargs={"map_name": "16x16"},
          max_episode_steps=_DUMMY_MAX_EP_STEPS)
 
 
@@ -93,6 +76,7 @@ class FrozenLakeABC(EnvironmentABC):
         self._alter_transition_func_if_needed(self._slip_prob)
         self._iod_strat = iod_strat
         self._frozen_cycler = self._make_frozen_raw_state_cycler()
+        self._manhattan_pmf = self._make_manhattan_pmf()
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
@@ -138,6 +122,24 @@ class FrozenLakeABC(EnvironmentABC):
     def _make_frozen_raw_state_cycler(self):
         return iter(self._get_nonterminal_states_raw())
 
+    def _make_manhattan_pmf(self):
+        frozen_states_raw = self._get_nonterminal_states_raw()
+        goal_state_x_y = np.array([self._GRID_SIZE - 1, self._GRID_SIZE - 1])
+        manhattan_dists = {}
+        for frozen_state_raw in frozen_states_raw:
+            frozen_state_x_y = \
+                self._convert_raw_obs_to_x_y_coordinates(frozen_state_raw)
+            manhattan_dists[frozen_state_raw] = \
+                sum(np.abs(goal_state_x_y - frozen_state_x_y))
+
+        # softmax
+        pmf = {}
+        denom = sum([np.e**val for val in list(manhattan_dists.values())])
+        for (frozen_state_raw, manhattan_dist) in manhattan_dists.items():
+            pmf[frozen_state_raw] = (np.e**manhattan_dist) / denom
+        assert np.isclose(sum(list(pmf.values())), 1.0)
+        return pmf
+
     def _get_nonterminal_states_raw(self):
         desc = self._wrapped_env.desc.flatten()
         nonterminal_states_raw = [
@@ -157,6 +159,15 @@ class FrozenLakeABC(EnvironmentABC):
             return self._uniform_random_initial_obs_raw()
         elif self._iod_strat == "frozen_no_repeat":
             return next(self._frozen_cycler)
+        elif self._iod_strat == "frozen_plus_manhattan":
+            try:
+                return next(self._frozen_cycler)
+            except StopIteration:
+                # cycled through all frozen states, now sample using manhattan
+                # dist.
+                return self._iod_rng.choice(a=list(self._manhattan_pmf.keys()),
+                                            p=list(
+                                                self._manhattan_pmf.values()))
         else:
             assert False
 
