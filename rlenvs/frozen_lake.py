@@ -14,11 +14,12 @@ _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
 _IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat",
-               "frozen_plus_goal_dist")
+               "frozen_plus_goal_dist", "goal_dist")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
 _TIME_LIMIT_MULT = 3
+_GOAL_DIST_PMF_BASE = 1.1
 _UNITY_WEIGHT = 1.0
 
 MAPS["12x12"] = \
@@ -154,11 +155,13 @@ class FrozenLakeABC(EnvironmentABC):
         frozen_states_raw = self._get_nonterminal_states_raw()
         assert len(frozen_states_raw) == len(self._FROZEN_GOAL_DISTS)
 
+        # pmf is softmax with custom base
         pmf = {}
-        denom = sum([goal_dist for goal_dist in self._FROZEN_GOAL_DISTS])
+        base = _GOAL_DIST_PMF_BASE
+        denom = sum([base**goal_dist for goal_dist in self._FROZEN_GOAL_DISTS])
         for (frozen_state_raw, goal_dist) in zip(frozen_states_raw,
                                                  self._FROZEN_GOAL_DISTS):
-            pmf[frozen_state_raw] = goal_dist / denom
+            pmf[frozen_state_raw] = base**goal_dist / denom
         assert np.isclose(sum(list(pmf.values())), 1.0)
         return pmf
 
@@ -187,6 +190,8 @@ class FrozenLakeABC(EnvironmentABC):
             obs = next(self._frozen_cycler)
         elif self._iod_strat == "frozen_plus_goal_dist":
             (obs, weight) = self._frozen_plus_goal_dist_obs_raw()
+        elif self._iod_strat == "goal_dist":
+            (obs, weight) = self._goal_dist_obs_raw()
         else:
             assert False
 
@@ -202,12 +207,16 @@ class FrozenLakeABC(EnvironmentABC):
         try:
             obs = next(self._frozen_iter)
         except StopIteration:
-            obs = self._iod_rng.choice(a=list(self._goal_dist_pmf.keys()),
-                                       p=list(self._goal_dist_pmf.values()))
-            pmf_mass = self._goal_dist_pmf[obs]
-            actual_mass = 1 / self._num_nonterminal_states
-            # importance sampling weight correction
-            weight = actual_mass / pmf_mass
+            (obs, weight) = self._goal_dist_obs_raw()
+        return (obs, weight)
+
+    def _goal_dist_obs_raw(self):
+        obs = self._iod_rng.choice(a=list(self._goal_dist_pmf.keys()),
+                                   p=list(self._goal_dist_pmf.values()))
+        pmf_mass = self._goal_dist_pmf[obs]
+        actual_mass = 1 / self._num_nonterminal_states
+        # importance sampling weight correction
+        weight = actual_mass / pmf_mass
         return (obs, weight)
 
     @property
