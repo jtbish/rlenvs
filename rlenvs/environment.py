@@ -16,9 +16,12 @@ _GAMMA_MIN = 0.0
 _GAMMA_MAX = 1.0
 _NUM_ROLLOUTS_MIN = 1
 TIME_LIMIT_MIN = 1
+_NULL_ACTION = -1
 
 EnvironmentResponse = namedtuple("EnvironmentResponse",
                                  ["obs", "reward", "is_terminal"])
+PerfAssessmentResponse = namedtuple("PerfAssessmentResponse",
+                                    ["perf", "time_steps_used", "failed"])
 
 
 class EnvironmentABC(metaclass=abc.ABCMeta):
@@ -128,9 +131,16 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         # reset internals in wrapped env
         self._wrapped_env.reset()
         # then gen an initial obs and inject it into wrapped env
-        initial_obs = self._sample_initial_obs()
+        (initial_obs, _) = self._sample_initial_obs()
         self._inject_obs_into_wrapped_env(initial_obs)
         return initial_obs
+
+    def perf_eval_reset(self):
+        self._is_terminal = False
+        self._wrapped_env.reset()
+        (initial_obs, weight) = self._sample_initial_obs()
+        self._inject_obs_into_wrapped_env(initial_obs)
+        return (initial_obs, weight)
 
     def _truncate_obs(self, obs):
         """Necessary to enforce observations are in (possibly) custom obs
@@ -195,18 +205,31 @@ def assess_perf(env, policy, num_rollouts, gamma):
 
 
 def _assess_perf(env, policy, num_rollouts, gamma):
+    time_steps_used = 0
     returns = []
+    weights = []
+
     for _ in range(num_rollouts):
-        obs = env.reset()
+        (obs, weight) = env.perf_eval_reset()
         return_ = 0.0
         time_step = 0
         while True:
             action = policy.select_action(obs)
+            if action == _NULL_ACTION:
+                return PerfAssessmentResponse(perf=env.perf_lower_bound,
+                                              time_steps_used=time_steps_used,
+                                              failed=True)
             env_response = env.step(action)
             obs = env_response.obs
             return_ += ((gamma**time_step) * env_response.reward)
             time_step += 1
+            time_steps_used += 1
             if env_response.is_terminal:
                 break
         returns.append(return_)
-    return np.mean(returns)
+        weights.append(weight)
+
+    expected_return = np.average(a=returns, weights=weights)
+    return PerfAssessmentResponse(perf=expected_return,
+                                  time_steps_used=time_steps_used,
+                                  failed=False)
