@@ -18,8 +18,7 @@ _IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat",
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
-_TIME_LIMIT_MULT = 3
-_GOAL_DIST_PMF_BASE = 1.1
+_DEFAULT_TIME_LIMIT_MULT = 1.5
 _UNITY_WEIGHT = 1.0
 
 MAPS["12x12"] = \
@@ -65,9 +64,14 @@ register(id="FrozenLake16x16-v0",
          max_episode_steps=_DUMMY_MAX_EP_STEPS)
 
 
-def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=0):
+def make_frozen_lake_env(grid_size,
+                         slip_prob,
+                         iod_strat,
+                         time_limit_mult=_DEFAULT_TIME_LIMIT_MULT,
+                         seed=0):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
+    assert time_limit_mult >= 1
     if grid_size == 4:
         cls = FrozenLake4x4
     elif grid_size == 8:
@@ -78,16 +82,16 @@ def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=0):
         cls = FrozenLake16x16
     else:
         assert False
-    return cls(slip_prob, iod_strat, seed)
+    return cls(slip_prob, iod_strat, time_limit_mult, seed)
 
 
 class FrozenLakeABC(EnvironmentABC):
     """Changes observations and observation space to be an (x, y) grid instead
     of simple numbered array of cells."""
-    def __init__(self, slip_prob, iod_strat, seed):
+    def __init__(self, slip_prob, iod_strat, time_limit_mult, seed):
         is_slippery = slip_prob > 0.0
-        # c_t*(2n-2), c_t = tl mult, n = grid size
-        time_limit = _TIME_LIMIT_MULT * (2 * self._GRID_SIZE - 2)
+        # ceil(c_t*(2n-2)), c_t = tl mult, n = grid size
+        time_limit = math.ceil(time_limit_mult * (2 * self._GRID_SIZE - 2))
         super().__init__(env_name=self._GYM_ENV_NAME,
                          time_limit=time_limit,
                          env_kwargs={"is_slippery": is_slippery},
@@ -155,13 +159,11 @@ class FrozenLakeABC(EnvironmentABC):
         frozen_states_raw = self._get_nonterminal_states_raw()
         assert len(frozen_states_raw) == len(self._FROZEN_GOAL_DISTS)
 
-        # pmf is softmax with custom base
         pmf = {}
-        base = _GOAL_DIST_PMF_BASE
-        denom = sum([base**goal_dist for goal_dist in self._FROZEN_GOAL_DISTS])
+        denom = sum([goal_dist for goal_dist in self._FROZEN_GOAL_DISTS])
         for (frozen_state_raw, goal_dist) in zip(frozen_states_raw,
                                                  self._FROZEN_GOAL_DISTS):
-            pmf[frozen_state_raw] = base**goal_dist / denom
+            pmf[frozen_state_raw] = goal_dist / denom
         assert np.isclose(sum(list(pmf.values())), 1.0)
         return pmf
 
