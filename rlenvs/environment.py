@@ -131,16 +131,9 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         # reset internals in wrapped env
         self._wrapped_env.reset()
         # then gen an initial obs and inject it into wrapped env
-        (initial_obs, _) = self._sample_initial_obs()
+        initial_obs = self._sample_initial_obs()
         self._inject_obs_into_wrapped_env(initial_obs)
         return initial_obs
-
-    def perf_eval_reset(self):
-        self._is_terminal = False
-        self._wrapped_env.reset()
-        (initial_obs, weight) = self._sample_initial_obs()
-        self._inject_obs_into_wrapped_env(initial_obs)
-        return (initial_obs, weight)
 
     def _truncate_obs(self, obs):
         """Necessary to enforce observations are in (possibly) custom obs
@@ -207,10 +200,9 @@ def assess_perf(env, policy, num_rollouts, gamma):
 def _assess_perf(env, policy, num_rollouts, gamma):
     time_steps_used = 0
     returns = []
-    weights = []
 
     for _ in range(num_rollouts):
-        (obs, weight) = env.perf_eval_reset()
+        obs = env.reset()
         return_ = 0.0
         time_step = 0
         while True:
@@ -227,9 +219,8 @@ def _assess_perf(env, policy, num_rollouts, gamma):
             if env_response.is_terminal:
                 break
         returns.append(return_)
-        weights.append(weight)
 
-    expected_return = np.average(a=returns, weights=weights)
+    expected_return = np.mean(returns)
     return PerfAssessmentResponse(perf=expected_return,
                                   time_steps_used=time_steps_used,
                                   failed=False)
