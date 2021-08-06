@@ -19,9 +19,10 @@ TIME_LIMIT_MIN = 1
 _NULL_ACTION = -1
 
 EnvironmentResponse = namedtuple("EnvironmentResponse",
-                                 ["obs", "reward", "is_terminal"])
-PerfAssessmentResponse = namedtuple("PerfAssessmentResponse",
-                                    ["perf", "time_steps_used", "failed"])
+                                 ["obs", "reward", "is_terminal", "info"])
+PerfAssessmentResponse = namedtuple(
+    "PerfAssessmentResponse",
+    ["perf", "time_steps_used", "time_limit_trunced", "failed"])
 
 
 class EnvironmentABC(metaclass=abc.ABCMeta):
@@ -171,7 +172,8 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
 
         return EnvironmentResponse(obs=wrapped_obs_trunc,
                                    reward=wrapped_reward,
-                                   is_terminal=self._is_terminal)
+                                   is_terminal=self._is_terminal,
+                                   info=wrapped_info)
 
     def _inject_obs_into_wrapped_env(self, obs):
         unwrapped_env = self._wrapped_env.unwrapped
@@ -200,6 +202,7 @@ def assess_perf(env, policy, num_rollouts, gamma):
 def _assess_perf(env, policy, num_rollouts, gamma):
     time_steps_used = 0
     returns = []
+    time_limit_trunced = False
 
     for _ in range(num_rollouts):
         obs = env.reset()
@@ -208,10 +211,14 @@ def _assess_perf(env, policy, num_rollouts, gamma):
         while True:
             action = policy.select_action(obs)
             if action == _NULL_ACTION:
-                return PerfAssessmentResponse(perf=env.perf_lower_bound,
-                                              time_steps_used=time_steps_used,
-                                              failed=True)
+                return PerfAssessmentResponse(
+                    perf=env.perf_lower_bound,
+                    time_steps_used=time_steps_used,
+                    time_limit_trunced=time_limit_trunced,
+                    failed=True)
             env_response = env.step(action)
+            time_limit_trunced = time_limit_trunced or env_response.info.get(
+                "TimeLimit.truncated", False)
             obs = env_response.obs
             return_ += ((gamma**time_step) * env_response.reward)
             time_step += 1
@@ -223,4 +230,5 @@ def _assess_perf(env, policy, num_rollouts, gamma):
     expected_return = np.mean(returns)
     return PerfAssessmentResponse(perf=expected_return,
                                   time_steps_used=time_steps_used,
+                                  time_limit_trunced=time_limit_trunced,
                                   failed=False)

@@ -1,4 +1,5 @@
 import copy
+import logging
 import math
 from itertools import cycle
 
@@ -17,7 +18,29 @@ _IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
-_DEFAULT_TIME_LIMIT_MULT = 2
+_DEFAULT_TIME_LIMIT_MULT = 20
+_MIN_TIME_LIMIT_MULT = 3
+_DEFAULT_SEED = 0
+
+# keys are (grid_size, slip_prob) tuples
+_KNOWN_TIME_LIMIT_MULTS = {
+    (4, 0.0): 4,
+    (4, 0.1): 5,
+    (4, 0.25): 5,
+    (4, 0.4): 15,
+    (8, 0.0): 4,
+    (8, 0.1): 4,
+    (8, 0.25): 8,
+    (8, 0.4): 18,
+    (12, 0.0): 4,
+    (12, 0.1): 4,
+    (12, 0.25): 5,
+    (12, 0.4): 9,
+    (16, 0.0): 4,
+    (16, 0.1): 4,
+    (16, 0.25): 6,
+    (16, 0.4): 10
+}
 
 MAPS["12x12"] = \
     ["SFFHFFFFFHFF",
@@ -51,7 +74,6 @@ MAPS["16x16"] = \
      "HFFFHFFHFHFFFHFF",
      "FFFFHHFFFFFFFFHG"]
 
-
 register(id="FrozenLake12x12-v0",
          entry_point="gym.envs.toy_text:FrozenLakeEnv",
          kwargs={"map_name": "12x12"},
@@ -66,11 +88,22 @@ register(id="FrozenLake16x16-v0",
 def make_frozen_lake_env(grid_size,
                          slip_prob,
                          iod_strat,
-                         time_limit_mult=_DEFAULT_TIME_LIMIT_MULT,
-                         seed=0):
+                         time_limit_mult=None,
+                         seed=_DEFAULT_SEED):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
-    assert time_limit_mult >= 1
+    # try lookup time limit mult from known ones if not already given
+    if time_limit_mult is None:
+        time_limit_mult = _KNOWN_TIME_LIMIT_MULTS.get((grid_size, slip_prob),
+                                                      None)
+    # if time limit mult still null, assign default val
+    if time_limit_mult is None:
+        logging.warning(f"Assigning FrozenLake time limit mult its default "
+                        f"value of {_DEFAULT_TIME_LIMIT_MULT}. This may not "
+                        f"be desired behaviour!")
+        time_limit_mult = _DEFAULT_TIME_LIMIT_MULT
+    assert isinstance(time_limit_mult, int)
+    assert time_limit_mult >= _MIN_TIME_LIMIT_MULT
     if grid_size == 4:
         cls = FrozenLake4x4
     elif grid_size == 8:
@@ -89,8 +122,8 @@ class FrozenLakeABC(EnvironmentABC):
     of simple numbered array of cells."""
     def __init__(self, slip_prob, iod_strat, time_limit_mult, seed):
         is_slippery = slip_prob > 0.0
-        # ceil(c_tl*2n), c_tl = tl mult, n = grid size
-        time_limit = math.ceil(time_limit_mult * 2 * self._GRID_SIZE)
+        # tl = c_tl * N
+        time_limit = time_limit_mult * self._GRID_SIZE
         super().__init__(env_name=self._GYM_ENV_NAME,
                          time_limit=time_limit,
                          env_kwargs={"is_slippery": is_slippery},
@@ -238,7 +271,8 @@ class FrozenLakeABC(EnvironmentABC):
         converted_obs = self._convert_raw_obs_to_x_y_coordinates(raw_obs)
         return EnvironmentResponse(obs=converted_obs,
                                    reward=raw_response.reward,
-                                   is_terminal=raw_response.is_terminal)
+                                   is_terminal=raw_response.is_terminal,
+                                   info=raw_response.info)
 
 
 class FrozenLake4x4(FrozenLakeABC):
