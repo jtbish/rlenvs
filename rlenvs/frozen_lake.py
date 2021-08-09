@@ -23,6 +23,7 @@ _MIN_TIME_LIMIT_MULT = 3
 _DEFAULT_SEED = 0
 
 # keys are (grid_size, slip_prob) tuples
+# for stochastic cases, based on 30 rollouts from each state
 _KNOWN_TIME_LIMIT_MULTS = {
     (4, 0.0): 3,
     (4, 0.1): 4,
