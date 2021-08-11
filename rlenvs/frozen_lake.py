@@ -113,6 +113,8 @@ def make_frozen_lake_env(grid_size,
         time_limit_mult = _DEFAULT_TIME_LIMIT_MULT
     assert isinstance(time_limit_mult, int)
     assert time_limit_mult >= _MIN_TIME_LIMIT_MULT
+    logging.info(f"Using FrozenLake tl mult of {time_limit_mult} "
+                 f"for (gs, sp): ({grid_size}, {slip_prob})")
     if grid_size == 4:
         cls = FrozenLake4x4
     elif grid_size == 8:
