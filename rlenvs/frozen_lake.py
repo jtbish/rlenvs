@@ -14,42 +14,63 @@ from .obs_space import ObsSpaceBuilder
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
-_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat")
+_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat",
+               "frozen_corners_no_repeat", "frozen_corners_repeat",
+               "repr_no_repeat", "repr_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
-_DEFAULT_TIME_LIMIT_MULT = 20
 _MIN_TIME_LIMIT_MULT = 3
+_DEFAULT_TIME_LIMIT_MULT = 25
 _DEFAULT_SEED = 0
 
-# keys are (grid_size, slip_prob) tuples
-# for stochastic cases, based on 10 rollouts from each state
+# keys are (grid_size, slip_prob) tuples.
+# based on rollouts from *frozen corner states*,
+# 1 rollout per state for determinstic, 30 for stochastic
 _KNOWN_TIME_LIMIT_MULTS = {
     (4, 0.0): 3,
-    (8, 0.0): 3,
-    (12, 0.0): 3,
-    (16, 0.0): 3,
-    (4, 0.1): 4,
+    (4, 0.1): 3,
     (4, 0.25): 4,
-    (4, 0.3): 6,
-    (4, 0.4): 12,
-    (4, 0.5): 19,
+    (4, 0.3): 4,
+    (4, 0.4): 20,
+    (4, 0.5): 14,
+    (8, 0.0): 3,
     (8, 0.1): 3,
-    (8, 0.25): 6,
+    (8, 0.25): 5,
     (8, 0.3): 6,
-    (8, 0.4): 12,
-    (8, 0.5): 24,
+    (8, 0.4): 11,
+    (8, 0.5): 20,
+    (12, 0.0): 3,
     (12, 0.1): 3,
     (12, 0.25): 4,
-    (12, 0.3): 5,
+    (12, 0.3): 6,
     (12, 0.4): 7,
-    (12, 0.5): 9,
+    (12, 0.5): 6,
+    (16, 0.0): 3,
     (16, 0.1): 3,
-    (16, 0.25): 5,
-    (16, 0.3): 7,
+    (16, 0.25): 4,
+    (16, 0.3): 5,
     (16, 0.4): 8,
-    (16, 0.5): 16
+    (16, 0.5): 10
 }
+
+# modify 4x4 map to make bottom left corner F, shift H that was there one cell
+# to right
+MAPS["4x4"] = \
+    ["SFFF",
+     "FHFH",
+     "FFFH",
+     "FHFG"]
+
+MAPS["8x8"] = \
+    ["SFFFFFFF",
+     "FFFFFFFF",
+     "FFFHFFFF",
+     "FFFFFHFF",
+     "FFFHFFFF",
+     "FHHFFFHF",
+     "FHFFHFHF",
+     "FFFHFFFG"]
 
 MAPS["12x12"] = \
     ["SFFHFFFFFHFF",
@@ -148,6 +169,11 @@ class FrozenLakeABC(EnvironmentABC):
         self._iod_strat = iod_strat
         self._frozen_iter = self._make_frozen_raw_state_iter()
         self._frozen_cycler = self._make_frozen_raw_state_cycler()
+        self._frozen_corners_iter = self._make_frozen_corners_raw_state_iter()
+        self._frozen_corners_cycler = \
+            self._make_frozen_corners_raw_state_cycler()
+        self._repr_states_iter = self._make_repr_raw_state_iter()
+        self._repr_states_cycler = self._make_repr_raw_state_cycler()
         self._num_nonterminal_states = len(self.nonterminal_states)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
@@ -197,6 +223,18 @@ class FrozenLakeABC(EnvironmentABC):
     def _make_frozen_raw_state_cycler(self):
         return cycle(self._get_nonterminal_states_raw())
 
+    def _make_frozen_corners_raw_state_iter(self):
+        return iter(self._get_frozen_corners_raw())
+
+    def _make_frozen_corners_raw_state_cycler(self):
+        return cycle(self._get_frozen_corners_raw())
+
+    def _make_repr_raw_state_iter(self):
+        return iter(self._get_repr_states_raw())
+
+    def _make_repr_raw_state_cycler(self):
+        return cycle(self._get_repr_states_raw())
+
     def _get_nonterminal_states_raw(self):
         desc = self._wrapped_env.desc.flatten()
         nonterminal_states_raw = [
@@ -204,6 +242,19 @@ class FrozenLakeABC(EnvironmentABC):
             if letter == b'S' or letter == b'F'
         ]
         return nonterminal_states_raw
+
+    def _get_frozen_corners_raw(self):
+        frozen_corners_raw = [0]  # top left
+        frozen_corners_raw.append(self._GRID_SIZE - 1)  # top right
+        # bottom left
+        frozen_corners_raw.append(self._GRID_SIZE * (self._GRID_SIZE - 1))
+        return frozen_corners_raw
+
+    def _get_repr_states_raw(self):
+        """So called "representative" states are the 3 frozen corners + any state
+        in the grid that is "boxed in": i.e. 3/4 of its neighbours are walls or
+        holes."""
+        return self._get_frozen_corners_raw() + self._BOXED_IN_STATES_RAW
 
     @property
     def perf_lower_bound(self):
@@ -218,6 +269,14 @@ class FrozenLakeABC(EnvironmentABC):
             return next(self._frozen_iter)
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
+        elif self._iod_strat == "frozen_corners_no_repeat":
+            return next(self._frozen_corners_iter)
+        elif self._iod_strat == "frozen_corners_repeat":
+            return next(self._frozen_corners_cycler)
+        elif self._iod_strat == "repr_no_repeat":
+            return next(self._repr_states_iter)
+        elif self._iod_strat == "repr_repeat":
+            return next(self._repr_states_cycler)
         else:
             assert False
 
@@ -289,18 +348,22 @@ class FrozenLakeABC(EnvironmentABC):
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
+    _BOXED_IN_STATES_RAW = []  # no extra boxed in states for 4x4
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
+    _BOXED_IN_STATES_RAW = [60]
 
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
+    _BOXED_IN_STATES_RAW = [4, 27, 29, 40, 136, 141]
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
+    _BOXED_IN_STATES_RAW = [8, 91, 164, 179, 181]
