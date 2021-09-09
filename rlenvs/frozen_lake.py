@@ -14,58 +14,17 @@ from .obs_space import ObsSpaceBuilder
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
-_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat",
-               "frozen_corners_no_repeat", "frozen_corners_repeat",
-               "frozen_corners_and_middle_no_repeat",
-               "frozen_corners_and_middle_repeat")
+_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
-_MIN_TIME_LIMIT_MULT = 3
-_DEFAULT_TIME_LIMIT_MULT = 25
 _DEFAULT_SEED = 0
 
-# keys are (grid_size, slip_prob) tuples.
-# based on rollouts from *frozen corner and middle* states
-# 1 rollout per state for determinstic, 30 for stochastic
-_KNOWN_TIME_LIMIT_MULTS = {
-    (4, 0.0): 3,
-    (4, 0.1): 4,
-    (4, 0.2): 3,
-    (4, 0.25): 4,
-    (4, 0.3): 4,
-    (4, 0.4): 19,
-    (4, 0.5): 10,
-    (8, 0.0): 3,
-    (8, 0.1): 3,
-    (8, 0.2): 4,
-    (8, 0.25): 5,
-    (8, 0.3): 6,
-    (8, 0.4): 9,
-    (8, 0.5): 20,
-    (12, 0.0): 3,
-    (12, 0.1): 3,
-    (12, 0.2): 4,
-    (12, 0.25): 3,
-    (12, 0.3): 5,
-    (12, 0.4): 6,
-    (12, 0.5): 8,
-    (16, 0.0): 3,
-    (16, 0.1): 3,
-    (16, 0.2): 3,
-    (16, 0.25): 4,
-    (16, 0.3): 6,
-    (16, 0.4): 6,
-    (16, 0.5): 12
-}
-
-# modify 4x4 map to make bottom left corner F, shift H that was there one cell
-# to right
 MAPS["4x4"] = \
     ["SFFF",
      "FHFH",
      "FFFH",
-     "FHFG"]
+     "HFFG"]
 
 MAPS["8x8"] = \
     ["SFFFFFFF",
@@ -123,24 +82,9 @@ register(id="FrozenLake16x16-v0",
 def make_frozen_lake_env(grid_size,
                          slip_prob,
                          iod_strat,
-                         time_limit_mult=None,
                          seed=_DEFAULT_SEED):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
-    # try lookup time limit mult from known ones if not already given
-    if time_limit_mult is None:
-        time_limit_mult = _KNOWN_TIME_LIMIT_MULTS.get((grid_size, slip_prob),
-                                                      None)
-    # if time limit mult still null, assign default val
-    if time_limit_mult is None:
-        logging.warning(f"Assigning FrozenLake time limit mult its default "
-                        f"value of {_DEFAULT_TIME_LIMIT_MULT}. This may not "
-                        f"be desired behaviour!")
-        time_limit_mult = _DEFAULT_TIME_LIMIT_MULT
-    assert isinstance(time_limit_mult, int)
-    assert time_limit_mult >= _MIN_TIME_LIMIT_MULT
-    logging.info(f"Using FrozenLake tl mult of {time_limit_mult} "
-                 f"for (gs, sp): ({grid_size}, {slip_prob})")
     if grid_size == 4:
         cls = FrozenLake4x4
     elif grid_size == 8:
@@ -151,18 +95,16 @@ def make_frozen_lake_env(grid_size,
         cls = FrozenLake16x16
     else:
         assert False
-    return cls(slip_prob, iod_strat, time_limit_mult, seed)
+    return cls(slip_prob, iod_strat, seed)
 
 
 class FrozenLakeABC(EnvironmentABC):
     """Changes observations and observation space to be an (x, y) grid instead
     of simple numbered array of cells."""
-    def __init__(self, slip_prob, iod_strat, time_limit_mult, seed):
+    def __init__(self, slip_prob, iod_strat, seed):
         is_slippery = slip_prob > 0.0
-        # tl = c_tl * N
-        time_limit = time_limit_mult * self._GRID_SIZE
         super().__init__(env_name=self._GYM_ENV_NAME,
-                         time_limit=time_limit,
+                         time_limit=self._TIME_LIMIT,
                          env_kwargs={"is_slippery": is_slippery},
                          custom_obs_space=None,
                          custom_action_space=None,
@@ -174,14 +116,6 @@ class FrozenLakeABC(EnvironmentABC):
         self._iod_strat = iod_strat
         self._frozen_iter = self._make_frozen_raw_state_iter()
         self._frozen_cycler = self._make_frozen_raw_state_cycler()
-        self._frozen_corners_iter = self._make_frozen_corners_raw_state_iter()
-        self._frozen_corners_cycler = \
-            self._make_frozen_corners_raw_state_cycler()
-        self._frozen_corners_and_middle_iter = \
-            self._make_frozen_corners_and_middle_raw_state_iter()
-        self._frozen_corners_and_middle_cycler = \
-            self._make_frozen_corners_and_middle_raw_state_cycler()
-        self._num_nonterminal_states = len(self.nonterminal_states)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
@@ -230,18 +164,6 @@ class FrozenLakeABC(EnvironmentABC):
     def _make_frozen_raw_state_cycler(self):
         return cycle(self._get_nonterminal_states_raw())
 
-    def _make_frozen_corners_raw_state_iter(self):
-        return iter(self._get_frozen_corners_raw())
-
-    def _make_frozen_corners_raw_state_cycler(self):
-        return cycle(self._get_frozen_corners_raw())
-
-    def _make_frozen_corners_and_middle_raw_state_iter(self):
-        return iter(self._get_frozen_corners_and_middle_raw())
-
-    def _make_frozen_corners_and_middle_raw_state_cycler(self):
-        return cycle(self._get_frozen_corners_and_middle_raw())
-
     def _get_nonterminal_states_raw(self):
         desc = self._wrapped_env.desc.flatten()
         nonterminal_states_raw = [
@@ -249,20 +171,6 @@ class FrozenLakeABC(EnvironmentABC):
             if letter == b'S' or letter == b'F'
         ]
         return nonterminal_states_raw
-
-    def _get_frozen_corners_raw(self):
-        frozen_corners_raw = [0]  # top left
-        frozen_corners_raw.append(self._GRID_SIZE - 1)  # top right
-        # bottom left
-        frozen_corners_raw.append(self._GRID_SIZE * (self._GRID_SIZE - 1))
-        return frozen_corners_raw
-
-    def _get_frozen_corners_and_middle_raw(self):
-        # let x = (self._GRID_SIZE / 2), then middle state is (x, x)
-        assert self._GRID_SIZE % 2 == 0
-        x = (self._GRID_SIZE / 2)
-        middle_raw = int(x * self._GRID_SIZE + x)
-        return self._get_frozen_corners_raw() + [middle_raw]
 
     @property
     def perf_lower_bound(self):
@@ -277,14 +185,6 @@ class FrozenLakeABC(EnvironmentABC):
             return next(self._frozen_iter)
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
-        elif self._iod_strat == "frozen_corners_no_repeat":
-            return next(self._frozen_corners_iter)
-        elif self._iod_strat == "frozen_corners_repeat":
-            return next(self._frozen_corners_cycler)
-        elif self._iod_strat == "frozen_corners_and_middle_no_repeat":
-            return next(self._frozen_corners_and_middle_iter)
-        elif self._iod_strat == "frozen_corners_and_middle_repeat":
-            return next(self._frozen_corners_and_middle_cycler)
         else:
             assert False
 
@@ -356,18 +256,22 @@ class FrozenLakeABC(EnvironmentABC):
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
+    _TIME_LIMIT = 100
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
+    _TIME_LIMIT = 200
 
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
+    _TIME_LIMIT = 300
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
+    _TIME_LIMIT = 400
