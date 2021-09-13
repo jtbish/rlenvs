@@ -14,7 +14,9 @@ from .obs_space import ObsSpaceBuilder
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
-_IOD_STRATS = ("top_left", "uniform_rand", "frozen_no_repeat", "frozen_repeat")
+_IOD_STRATS = ("top_left", "frozen_uniform_rand", "frozen_no_repeat",
+               "frozen_repeat", "repr_uniform_rand", "repr_no_repeat",
+               "repr_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
@@ -79,10 +81,7 @@ register(id="FrozenLake16x16-v0",
          max_episode_steps=_DUMMY_MAX_EP_STEPS)
 
 
-def make_frozen_lake_env(grid_size,
-                         slip_prob,
-                         iod_strat,
-                         seed=_DEFAULT_SEED):
+def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=_DEFAULT_SEED):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
     if grid_size == 4:
@@ -114,8 +113,10 @@ class FrozenLakeABC(EnvironmentABC):
         self._slip_prob = slip_prob
         self._alter_transition_func_if_needed(self._slip_prob)
         self._iod_strat = iod_strat
-        self._frozen_iter = self._make_frozen_raw_state_iter()
-        self._frozen_cycler = self._make_frozen_raw_state_cycler()
+        self._frozen_iter = iter(self._get_nonterminal_states_raw())
+        self._frozen_cycler = cycle(self._get_nonterminal_states_raw())
+        self._repr_iter = iter(self._REPR_STATES_RAW)
+        self._repr_cycler = cycle(self._REPR_STATES_RAW)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
         obs_space_builder = ObsSpaceBuilder()
@@ -158,12 +159,6 @@ class FrozenLakeABC(EnvironmentABC):
                 P_mut[state][action] = P_cell_mut
         self._wrapped_env.unwrapped.P = P_mut
 
-    def _make_frozen_raw_state_iter(self):
-        return iter(self._get_nonterminal_states_raw())
-
-    def _make_frozen_raw_state_cycler(self):
-        return cycle(self._get_nonterminal_states_raw())
-
     def _get_nonterminal_states_raw(self):
         desc = self._wrapped_env.desc.flatten()
         nonterminal_states_raw = [
@@ -179,17 +174,26 @@ class FrozenLakeABC(EnvironmentABC):
     def _sample_initial_obs(self):
         if self._iod_strat == "top_left":
             return _TOP_LEFT_OBS_RAW
-        elif self._iod_strat == "uniform_rand":
-            return self._uniform_random_initial_obs_raw()
+        elif self._iod_strat == "frozen_uniform_rand":
+            return self._frozen_uniform_random_initial_obs_raw()
         elif self._iod_strat == "frozen_no_repeat":
             return next(self._frozen_iter)
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
+        elif self._iod_strat == "repr_uniform_rand":
+            return self._repr_uniform_random_initial_obs_raw()
+        elif self._iod_strat == "repr_no_repeat":
+            return next(self._repr_iter)
+        elif self._iod_strat == "repr_repeat":
+            return next(self._repr_cycler)
         else:
             assert False
 
-    def _uniform_random_initial_obs_raw(self):
+    def _frozen_uniform_random_initial_obs_raw(self):
         return self._iod_rng.choice(self._get_nonterminal_states_raw())
+
+    def _repr_uniform_random_initial_obs_raw(self):
+        return self._iod_rng.choice(self._REPR_STATES_RAW)
 
     @property
     def obs_space(self):
@@ -257,21 +261,28 @@ class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
     _TIME_LIMIT = 125
+    _REPR_STATES_RAW = [0, 3]
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
     _TIME_LIMIT = 250
+    _REPR_STATES_RAW = [0, 4, 7, 32, 36, 39, 56, 60]
 
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 375
+    _REPR_STATES_RAW = [0, 4, 8, 11, 48, 52, 59, 96, 100, 104, 107, 132, 136]
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
     _TIME_LIMIT = 500
+    _REPR_STATES_RAW = [
+        0, 4, 8, 12, 15, 64, 68, 76, 79, 128, 132, 136, 140, 192, 200, 204,
+        240, 248, 252
+    ]
