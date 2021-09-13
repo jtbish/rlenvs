@@ -261,7 +261,7 @@ class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
     _TIME_LIMIT = 125
-    _REPR_STATES_RAW = [0, 3]
+    _REPR_STATES_RAW = [0, 3, 13]
 
 
 class FrozenLake8x8(FrozenLakeABC):
@@ -275,7 +275,9 @@ class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 375
-    _REPR_STATES_RAW = [0, 4, 8, 11, 48, 52, 59, 96, 100, 104, 107, 132, 136]
+    _REPR_STATES_RAW = [
+        0, 4, 8, 11, 48, 52, 59, 68, 96, 100, 104, 107, 132, 136, 141
+    ]
 
 
 class FrozenLake16x16(FrozenLakeABC):
@@ -283,6 +285,6 @@ class FrozenLake16x16(FrozenLakeABC):
     _GRID_SIZE = 16
     _TIME_LIMIT = 500
     _REPR_STATES_RAW = [
-        0, 4, 8, 12, 15, 64, 68, 76, 79, 128, 132, 136, 140, 192, 200, 204,
-        240, 248, 252
+        0, 4, 8, 12, 15, 64, 68, 73, 76, 79, 128, 132, 136, 140, 159, 192, 200,
+        204, 223, 240, 248, 252
     ]
