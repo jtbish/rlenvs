@@ -22,12 +22,6 @@ _TOP_LEFT_OBS_RAW = 0
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
 _DEFAULT_SEED = 0
 
-MAPS["4x4"] = \
-    ["SFFF",
-     "FHFH",
-     "FFFH",
-     "HFFG"]
-
 MAPS["8x8"] = \
     ["SFFFFFFF",
      "FFFFFFFF",
@@ -60,12 +54,12 @@ MAPS["16x16"] = \
      "FFFFFFFHHFFHFFFF",
      "FFFFFFFHHFHFHFFH",
      "FHFFFHHFFFFFFFFF",
-     "FHFFHFFFFFFHHFFF",
-     "FFFFFFFFFFFFFFFH",
+     "FHFFHFFFFFFHHFFH",
+     "FFFFFFFFFFFFFFFF",
      "FFFFFFFFFFHFHHFF",
      "FFHHFHFFFFFFFFFF",
      "FFFFHFFFFFFFFHFF",
-     "FFFHHHFFFHFFFFFH",
+     "FFFHHHFFFHFFFFFF",
      "FFFFHFFFFFFFFHFF",
      "HFFFHFFHFHFFFHFF",
      "FFFFHHFFFFFFFFHG"]
@@ -84,9 +78,7 @@ register(id="FrozenLake16x16-v0",
 def make_frozen_lake_env(grid_size, slip_prob, iod_strat, seed=_DEFAULT_SEED):
     assert _SLIP_PROB_MIN_INCL <= slip_prob < _SLIP_PROB_MAX_EXCL
     assert iod_strat in _IOD_STRATS
-    if grid_size == 4:
-        cls = FrozenLake4x4
-    elif grid_size == 8:
+    if grid_size == 8:
         cls = FrozenLake8x8
     elif grid_size == 12:
         cls = FrozenLake12x12
@@ -257,13 +249,6 @@ class FrozenLakeABC(EnvironmentABC):
                                    info=raw_response.info)
 
 
-class FrozenLake4x4(FrozenLakeABC):
-    _GYM_ENV_NAME = "FrozenLake-v0"
-    _GRID_SIZE = 4
-    _TIME_LIMIT = 50
-    _REPR_STATES_RAW = [0, 3]
-
-
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
@@ -275,14 +260,11 @@ class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 150
-    _REPR_STATES_RAW = [0, 4, 8, 11, 48, 52, 59, 96, 100, 104, 107, 132, 136]
+    _REPR_STATES_RAW = [0, 6, 11, 72, 78, 83, 132, 138]
 
 
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
     _TIME_LIMIT = 200
-    _REPR_STATES_RAW = [
-        0, 4, 8, 12, 15, 64, 68, 76, 79, 128, 132, 136, 140, 192, 200,
-        204, 240, 248, 252
-    ]
+    _REPR_STATES_RAW = [0, 8, 15, 128, 136, 143, 240, 248]
