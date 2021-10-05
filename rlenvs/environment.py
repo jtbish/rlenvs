@@ -186,6 +186,9 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def is_terminal(self):
         return self._is_terminal
 
+    def reseed_iod_rng(self, new_seed):
+        self._iod_rng = self._make_iod_rng(new_seed)
+
     def render(self):
         self._wrapped_env.render()
 
