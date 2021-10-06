@@ -7,9 +7,9 @@ import numpy as np
 from gym.envs.registration import register
 from gym.envs.toy_text.frozen_lake import MAPS
 
-from .dimension import Dimension
+from .dimension import IntegerDimension
 from .environment import TIME_LIMIT_MIN, EnvironmentABC, EnvironmentResponse
-from .obs_space import ObsSpaceBuilder
+from .obs_space import IntegerObsSpaceBuilder
 
 _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
@@ -117,11 +117,11 @@ class FrozenLakeABC(EnvironmentABC):
         self._si_size = self._calc_si_size(self._iod_strat)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
-        obs_space_builder = ObsSpaceBuilder()
+        obs_space_builder = IntegerObsSpaceBuilder()
         for name in ("x", "y"):
             obs_space_builder.add_dim(
-                Dimension(lower=0, upper=(grid_size - 1), name=name))
-        return obs_space_builder.create_integer_space()
+                IntegerDimension(lower=0, upper=(grid_size - 1), name=name))
+        return obs_space_builder.create_space()
 
     def _alter_transition_func_if_needed(self, slip_prob):
         if slip_prob > 0.0:

@@ -8,9 +8,9 @@ from gym.envs.toy_text.discrete import DiscreteEnv
 from gym.spaces import Box, Discrete
 from gym.wrappers import TimeLimit
 
-from .dimension import Dimension
+from .dimension import IntegerDimension, RealDimension
 from .error import EndOfEpisodeError, InvalidSpecError
-from .obs_space import ObsSpaceBuilder
+from .obs_space import IntegerObsSpaceBuilder, RealObsSpaceBuilder
 
 _GAMMA_MIN = 0.0
 _GAMMA_MAX = 1.0
@@ -98,20 +98,20 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
 
     def _gen_1d_integer_obs_space(self, wrapped_env):
         num_obss = wrapped_env.observation_space.n
-        obs_space_builder = ObsSpaceBuilder()
+        obs_space_builder = IntegerObsSpaceBuilder()
         obs_space_builder.add_dim(
-            Dimension(lower=0, upper=(num_obss - 1), name="dim0"))
-        return obs_space_builder.create_integer_space()
+            IntegerDimension(lower=0, upper=(num_obss - 1), name="dim0"))
+        return obs_space_builder.create_space()
 
     def _gen_nd_real_obs_space(self, wrapped_env):
         lower_vector = wrapped_env.observation_space.low
         upper_vector = wrapped_env.observation_space.high
-        obs_space_builder = ObsSpaceBuilder()
+        obs_space_builder = RealObsSpaceBuilder()
         for (idx, (lower, upper)) in enumerate(zip(lower_vector,
                                                    upper_vector)):
             obs_space_builder.add_dim(
-                Dimension(lower=lower, upper=upper, name=f"dim{idx}"))
-        return obs_space_builder.create_real_space()
+                RealDimension(lower=lower, upper=upper, name=f"dim{idx}"))
+        return obs_space_builder.create_space()
 
     def _gen_action_space_if_not_given(self, wrapped_env, custom_action_space):
         if custom_action_space is None:
