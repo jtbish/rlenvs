@@ -1,7 +1,8 @@
-from .dimension import Dimension
-from .environment import EnvironmentABC, EnvironmentResponse
-from .obs_space import ObsSpaceBuilder, RealObsSpace
 import numpy as np
+
+from .dimension import RealDimension
+from .environment import EnvironmentABC, EnvironmentResponse
+from .obs_space import RealObsSpace, RealObsSpaceBuilder
 
 _OBS_DIM_LOWER = 0.0
 _OBS_DIM_UPPER = 1.0
@@ -17,16 +18,16 @@ class NormaliseWrapper(EnvironmentABC):
             self._gen_unit_hypercube_obs_space(self._wrapped.obs_space)
 
     def _gen_unit_hypercube_obs_space(self, wrapped_obs_space):
-        builder = ObsSpaceBuilder()
+        builder = RealObsSpaceBuilder()
         for dim in wrapped_obs_space:
-            builder.add_dim(Dimension(_OBS_DIM_LOWER, _OBS_DIM_UPPER,
-                                      dim.name))
-        return builder.create_real_space()
+            builder.add_dim(
+                RealDimension(_OBS_DIM_LOWER, _OBS_DIM_UPPER, dim.name))
+        return builder.create_space()
 
     def _normalise_wrapped_obs(self, wrapped_obs):
         normalised = []
         for (obs_compt, dim) in zip(wrapped_obs, self._wrapped.obs_space):
-            new_val = (obs_compt - dim.lower)/(dim.upper - dim.lower)
+            new_val = (obs_compt - dim.lower) / dim.span
             assert _OBS_DIM_LOWER <= new_val <= _OBS_DIM_UPPER
             normalised.append(new_val)
         return np.array(normalised)
@@ -45,6 +46,7 @@ class NormaliseWrapper(EnvironmentABC):
 
     @property
     def obs_space(self):
+        """Use non-wrapped obs space!"""
         return self._unit_hypercube_obs_space
 
     @property
@@ -60,10 +62,14 @@ class NormaliseWrapper(EnvironmentABC):
         return EnvironmentResponse(obs=self._normalise_wrapped_obs(
             wrapped_response.obs),
                                    reward=wrapped_response.reward,
-                                   is_terminal=wrapped_response.is_terminal)
+                                   is_terminal=wrapped_response.is_terminal,
+                                   info=wrapped_response.info)
 
     def is_terminal(self):
         return self._wrapped.is_terminal()
 
     def render(self):
         self._wrapped.render()
+
+    def reseed_iod_rng(self, new_seed):
+        self._wrapped.reseed_iod_rng(new_seed)

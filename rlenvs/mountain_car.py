@@ -1,9 +1,9 @@
 import numpy as np
 
-from .dimension import Dimension
+from .dimension import RealDimension
 from .environment import EnvironmentABC
-from .obs_space import ObsSpaceBuilder
 from .normalise import NormaliseWrapper
+from .obs_space import RealObsSpaceBuilder
 
 _GYM_ENV_NAME = "MountainCar-v0"
 _POS_LOWER = -1.2
@@ -17,11 +17,12 @@ _CUSTOM_ACTION_SPACE = (_LEFT_ACTION, _RIGHT_ACTION)
 _PERF_LB = -200
 _IOD_STRATS = ("bottom_zero_vel", "uniform")
 _TIME_LIMIT = 200
+_DEFAULT_SEED = 0
 
 
-def make_mountain_car_env(iod_strat="bottom_zero_vel",
+def make_mountain_car_env(iod_strat,
                           normalise=False,
-                          seed=0):
+                          seed=_DEFAULT_SEED):
     assert iod_strat in _IOD_STRATS
     mc = MountainCar(iod_strat, seed)
     if normalise:
@@ -57,8 +58,8 @@ class MountainCar(EnvironmentABC):
             assert False
 
     def _gen_custom_obs_space(self):
-        obs_space_builder = ObsSpaceBuilder()
+        obs_space_builder = RealObsSpaceBuilder()
         # order of dims is [pos, vel]
-        obs_space_builder.add_dim(Dimension(_POS_LOWER, _POS_UPPER, "pos"))
-        obs_space_builder.add_dim(Dimension(_VEL_LOWER, _VEL_UPPER, "vel"))
-        return obs_space_builder.create_real_space()
+        obs_space_builder.add_dim(RealDimension(_POS_LOWER, _POS_UPPER, "pos"))
+        obs_space_builder.add_dim(RealDimension(_VEL_LOWER, _VEL_UPPER, "vel"))
+        return obs_space_builder.create_space()

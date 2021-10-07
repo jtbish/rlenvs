@@ -3,9 +3,9 @@ import copy
 
 import numpy as np
 
-from .dimension import Dimension
+from .dimension import RealDimension
 from .environment import EnvironmentABC
-from .obs_space import ObsSpaceBuilder
+from .obs_space import RealObsSpaceBuilder
 
 _GYM_ENV_NAME = "CartPole-v0"
 _MAX_CART_VEL = 2.25
