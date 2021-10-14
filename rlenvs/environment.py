@@ -42,6 +42,7 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         self._time_limit = time_limit
         self._obs_space = self._gen_obs_space_if_not_given(
             self._wrapped_env, custom_obs_space)
+        self._do_obs_truncation = (custom_obs_space is not None)
         self._action_space = self._gen_action_space_if_not_given(
             self._wrapped_env, custom_action_space)
         self._iod_rng = self._make_iod_rng(seed)
@@ -142,13 +143,18 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         if np.isscalar(obs):
             assert len(self._obs_space) == 1
             dim = self._obs_space.dims[0]
-            return np.clip(obs, dim.lower, dim.upper)
+            return self._clip_obs_compt(obs_compt=obs, dim=dim)
         else:
             truncated_obs = []
-            for (feature_val, dim) in zip(obs, self._obs_space):
-                feature_val = np.clip(feature_val, dim.lower, dim.upper)
-                truncated_obs.append(feature_val)
+            for (obs_compt, dim) in zip(obs, self._obs_space):
+                obs_compt = self._clip_obs_compt(obs_compt, dim)
+                truncated_obs.append(obs_compt)
             return np.asarray(truncated_obs)
+
+    def _clip_obs_compt(self, obs_compt, dim):
+        obs_compt = max(obs_compt, dim.lower)
+        obs_compt = min(obs_compt, dim.upper)
+        return obs_compt
 
     def step(self, action):
         if self.is_terminal():
@@ -167,10 +173,11 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         # state of wrapped env is within obs space bounds via
         # injecting it back in after being (possibly) truncated
         self._is_terminal = wrapped_done
-        wrapped_obs_trunc = self._truncate_obs(wrapped_obs)
-        self._inject_obs_into_wrapped_env(wrapped_obs_trunc)
+        if self._do_obs_truncation:
+            wrapped_obs = self._truncate_obs(wrapped_obs)
+            self._inject_obs_into_wrapped_env(wrapped_obs)
 
-        return EnvironmentResponse(obs=wrapped_obs_trunc,
+        return EnvironmentResponse(obs=wrapped_obs,
                                    reward=wrapped_reward,
                                    is_terminal=self._is_terminal,
                                    info=wrapped_info)

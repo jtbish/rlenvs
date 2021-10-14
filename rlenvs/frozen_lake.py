@@ -242,10 +242,8 @@ class FrozenLakeABC(EnvironmentABC):
         # left, and flattening is done left to right, top to bottom.
         # x is the column coordinate, y is the row coordinate, both starting
         # from 0.
-        assert np.isscalar(raw_obs)
         x = raw_obs % self._GRID_SIZE
         y = math.floor(raw_obs / self._GRID_SIZE)
-        assert (y * self._GRID_SIZE + x) == raw_obs
         return np.asarray([x, y])
 
     def step(self, action):
