@@ -15,7 +15,8 @@ _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
 _IOD_STRATS = ("top_left", "frozen_uniform_rand", "frozen_no_repeat",
-               "frozen_repeat")
+               "frozen_repeat", "ssa_uniform_rand", "ssa_no_repeat",
+               "ssa_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
@@ -114,6 +115,8 @@ class FrozenLakeABC(EnvironmentABC):
         self._iod_strat = iod_strat
         self._frozen_iter = iter(self._get_nonterminal_states_raw())
         self._frozen_cycler = cycle(self._get_nonterminal_states_raw())
+        self._ssa_iter = iter(self._SSA_STATES_RAW)
+        self._ssa_cycler = cycle(self._SSA_STATES_RAW)
         self._si_size = self._calc_si_size(self._iod_strat)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
@@ -170,6 +173,8 @@ class FrozenLakeABC(EnvironmentABC):
             return 1
         elif "frozen" in self._iod_strat:
             return len(self.nonterminal_states)
+        elif "ssa" in self._iod_strat:
+            return len(self._SSA_STATES_RAW)
         else:
             assert False
 
@@ -185,16 +190,19 @@ class FrozenLakeABC(EnvironmentABC):
         if self._iod_strat == "top_left":
             return _TOP_LEFT_OBS_RAW
         elif self._iod_strat == "frozen_uniform_rand":
-            return self._frozen_uniform_random_initial_obs_raw()
+            return self._iod_rng.choice(self._get_nonterminal_states_raw())
         elif self._iod_strat == "frozen_no_repeat":
             return next(self._frozen_iter)
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
+        elif self._iod_strat == "ssa_uniform_rand":
+            return self._iod_rng.choice(self._SSA_STATES_RAW)
+        elif self._iod_strat == "ssa_no_repeat":
+            return next(self._ssa_iter)
+        elif self._iod_strat == "ssa_repeat":
+            return next(self._ssa_cycler)
         else:
             assert False
-
-    def _frozen_uniform_random_initial_obs_raw(self):
-        return self._iod_rng.choice(self._get_nonterminal_states_raw())
 
     @property
     def obs_space(self):
@@ -260,18 +268,27 @@ class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
     _TIME_LIMIT = 125
+    _SSA_STATES_RAW = [0, 3, 13]
+#    _SSB_STATES_RAW = [0, 3]
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
     _TIME_LIMIT = 250
+    _SSA_STATES_RAW = [0, 3, 5, 7, 24, 27, 31, 40, 43, 45, 47, 56, 61]
+#    _SSB_STATES_RAW = [0, 4, 7, 32, 36, 39, 56, 60]
 
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 375
+    _SSA_STATES_RAW = [
+        0, 5, 7, 11, 36, 43, 45, 47, 60, 63, 65, 67, 71, 84, 87, 89, 91, 93,
+        95, 108, 111, 115, 119, 132, 137, 139, 141
+    ]
+#    _SSB_STATES_RAW = []
 
 
 class FrozenLake16x16(FrozenLakeABC):
