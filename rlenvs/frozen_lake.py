@@ -110,6 +110,7 @@ class FrozenLakeABC(EnvironmentABC):
                          seed=seed)
         self._x_y_coordinates_obs_space = \
             self._gen_x_y_coordinates_obs_space(self._GRID_SIZE)
+        self._x_y_obs_cache = self._make_x_y_obs_cache(self._GRID_SIZE)
         self._slip_prob = slip_prob
         self._alter_transition_func_if_needed(self._slip_prob)
         self._iod_strat = iod_strat
@@ -125,6 +126,22 @@ class FrozenLakeABC(EnvironmentABC):
             obs_space_builder.add_dim(
                 IntegerDimension(lower=0, upper=(grid_size - 1), name=name))
         return obs_space_builder.create_space()
+
+    def _make_x_y_obs_cache(self, grid_size):
+        x_y_obs_cache = {}
+        for raw_obs in range(0, grid_size**2):
+            x_y_obs_cache[raw_obs] = \
+                self._convert_raw_obs_to_x_y_coordinates(raw_obs)
+        return x_y_obs_cache
+
+    def _convert_raw_obs_to_x_y_coordinates(self, raw_obs):
+        # raw obs is number indicating idx into flattened grid, where 0 is top
+        # left, and flattening is done left to right, top to bottom.
+        # x is the column coordinate, y is the row coordinate, both starting
+        # from 0.
+        x = raw_obs % self._GRID_SIZE
+        y = math.floor(raw_obs / self._GRID_SIZE)
+        return np.asarray([x, y])
 
     def _alter_transition_func_if_needed(self, slip_prob):
         if slip_prob > 0.0:
@@ -243,22 +260,12 @@ class FrozenLakeABC(EnvironmentABC):
 
     def reset(self):
         raw_obs = super().reset()
-        return self._convert_raw_obs_to_x_y_coordinates(raw_obs)
-
-    def _convert_raw_obs_to_x_y_coordinates(self, raw_obs):
-        # raw obs is number indicating idx into flattened grid, where 0 is top
-        # left, and flattening is done left to right, top to bottom.
-        # x is the column coordinate, y is the row coordinate, both starting
-        # from 0.
-        x = raw_obs % self._GRID_SIZE
-        y = math.floor(raw_obs / self._GRID_SIZE)
-        return np.asarray([x, y])
+        return self._x_y_obs_cache[raw_obs]
 
     def step(self, action):
         raw_response = super().step(action)
-        raw_obs = raw_response.obs
-        converted_obs = self._convert_raw_obs_to_x_y_coordinates(raw_obs)
-        return EnvironmentResponse(obs=converted_obs,
+        x_y_obs = self._x_y_obs_cache[raw_response.obs]
+        return EnvironmentResponse(obs=x_y_obs,
                                    reward=raw_response.reward,
                                    is_terminal=raw_response.is_terminal,
                                    info=raw_response.info)
