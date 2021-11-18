@@ -8,8 +8,8 @@ from gym.envs.registration import register
 from gym.envs.toy_text.frozen_lake import MAPS
 
 from .dimension import IntegerDimension
-from .environment import (NULL_ACTION, TIME_LIMIT_MIN, EnvironmentABC,
-                          EnvironmentResponse, PerfAssessmentResponse)
+from .environment import (TIME_LIMIT_MIN, EnvironmentABC,
+                          EnvironmentResponse)
 from .obs_space import IntegerObsSpaceBuilder
 
 _PERF_LB = 0.0
@@ -270,44 +270,6 @@ class FrozenLakeABC(EnvironmentABC):
                                    reward=raw_response.reward,
                                    is_terminal=raw_response.is_terminal,
                                    info=raw_response.info)
-
-    def assess_perf(self, policy, num_rollouts, gamma):
-        time_steps_used = 0
-        returns = []
-        time_limit_trunced = False
-
-        for _ in range(num_rollouts):
-            obs = self.reset()
-            return_ = 0.0
-            time_step = 0
-            while True:
-                action = policy.select_action(obs)
-                if action == NULL_ACTION:
-                    return PerfAssessmentResponse(
-                        perf=self.perf_lower_bound,
-                        time_steps_used=time_steps_used,
-                        time_limit_trunced=time_limit_trunced,
-                        failed=True)
-                env_response = self.step(action)
-                time_limit_trunced = time_limit_trunced or \
-                    env_response.info.get("TimeLimit.truncated", False)
-                obs = env_response.obs
-                reward = env_response.reward
-                # rewards of 0 cannot alter end return value so skip them
-                # to avoid computation
-                if reward != 0:
-                    return_ += ((gamma**time_step) * reward)
-                time_step += 1
-                time_steps_used += 1
-                if env_response.is_terminal:
-                    break
-            returns.append(return_)
-
-        expected_return = np.mean(returns)
-        return PerfAssessmentResponse(perf=expected_return,
-                                      time_steps_used=time_steps_used,
-                                      time_limit_trunced=time_limit_trunced,
-                                      failed=False)
 
 
 class FrozenLake4x4(FrozenLakeABC):

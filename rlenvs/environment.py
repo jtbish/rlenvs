@@ -199,40 +199,6 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def reseed_iod_rng(self, new_seed):
         self._iod_rng = self._make_iod_rng(new_seed)
 
-    def assess_perf(self, policy, num_rollouts, gamma):
-        time_steps_used = 0
-        returns = []
-        time_limit_trunced = False
-
-        for _ in range(num_rollouts):
-            obs = self.reset()
-            return_ = 0.0
-            time_step = 0
-            while True:
-                action = policy.select_action(obs)
-                if action == NULL_ACTION:
-                    return PerfAssessmentResponse(
-                        perf=self.perf_lower_bound,
-                        time_steps_used=time_steps_used,
-                        time_limit_trunced=time_limit_trunced,
-                        failed=True)
-                env_response = self.step(action)
-                time_limit_trunced = time_limit_trunced or \
-                    env_response.info.get("TimeLimit.truncated", False)
-                obs = env_response.obs
-                return_ += ((gamma**time_step) * env_response.reward)
-                time_step += 1
-                time_steps_used += 1
-                if env_response.is_terminal:
-                    break
-            returns.append(return_)
-
-        expected_return = np.mean(returns)
-        return PerfAssessmentResponse(perf=expected_return,
-                                      time_steps_used=time_steps_used,
-                                      time_limit_trunced=time_limit_trunced,
-                                      failed=False)
-
 
 def assess_perf(env, policy, num_rollouts, gamma):
     assert _GAMMA_MIN <= gamma <= _GAMMA_MAX
@@ -240,4 +206,39 @@ def assess_perf(env, policy, num_rollouts, gamma):
     # make copy of env for perf assessment so rng state is not modified
     # across assessments
     env = copy.deepcopy(env)
-    return env.assess_perf(policy, num_rollouts, gamma)
+    return _assess_perf(env, policy, num_rollouts, gamma)
+
+
+def _assess_perf(env, policy, num_rollouts, gamma):
+    time_steps_used = 0
+    returns = []
+    time_limit_trunced = False
+
+    for _ in range(num_rollouts):
+        obs = env.reset()
+        return_ = 0.0
+        time_step = 0
+        while True:
+            action = policy.select_action(obs)
+            if action == NULL_ACTION:
+                return PerfAssessmentResponse(
+                    perf=env.perf_lower_bound,
+                    time_steps_used=time_steps_used,
+                    time_limit_trunced=time_limit_trunced,
+                    failed=True)
+            env_response = env.step(action)
+            time_limit_trunced = time_limit_trunced or \
+                env_response.info.get("TimeLimit.truncated", False)
+            obs = env_response.obs
+            return_ += ((gamma**time_step) * env_response.reward)
+            time_step += 1
+            time_steps_used += 1
+            if env_response.is_terminal:
+                break
+        returns.append(return_)
+
+    expected_return = np.mean(returns)
+    return PerfAssessmentResponse(perf=expected_return,
+                                  time_steps_used=time_steps_used,
+                                  time_limit_trunced=time_limit_trunced,
+                                  failed=False)
