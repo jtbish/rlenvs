@@ -8,7 +8,8 @@ from gym.envs.registration import register
 from gym.envs.toy_text.frozen_lake import MAPS
 
 from .dimension import IntegerDimension
-from .environment import TIME_LIMIT_MIN, EnvironmentABC, EnvironmentResponse
+from .environment import (NULL_ACTION, TIME_LIMIT_MIN, EnvironmentABC,
+                          EnvironmentResponse, PerfAssessmentResponse)
 from .obs_space import IntegerObsSpaceBuilder
 
 _PERF_LB = 0.0
@@ -270,12 +271,52 @@ class FrozenLakeABC(EnvironmentABC):
                                    is_terminal=raw_response.is_terminal,
                                    info=raw_response.info)
 
+    def assess_perf(self, policy, num_rollouts, gamma):
+        time_steps_used = 0
+        returns = []
+        time_limit_trunced = False
+
+        for _ in range(num_rollouts):
+            obs = self.reset()
+            return_ = 0.0
+            time_step = 0
+            while True:
+                action = policy.select_action(obs)
+                if action == NULL_ACTION:
+                    return PerfAssessmentResponse(
+                        perf=self.perf_lower_bound,
+                        time_steps_used=time_steps_used,
+                        time_limit_trunced=time_limit_trunced,
+                        failed=True)
+                env_response = self.step(action)
+                time_limit_trunced = time_limit_trunced or \
+                    env_response.info.get("TimeLimit.truncated", False)
+                obs = env_response.obs
+                reward = env_response.reward
+                # rewards of 0 cannot alter end return value so skip them
+                # to avoid computation
+                if reward != 0:
+                    return_ += ((gamma**time_step) * reward)
+                time_step += 1
+                time_steps_used += 1
+                if env_response.is_terminal:
+                    break
+            returns.append(return_)
+
+        expected_return = np.mean(returns)
+        return PerfAssessmentResponse(perf=expected_return,
+                                      time_steps_used=time_steps_used,
+                                      time_limit_trunced=time_limit_trunced,
+                                      failed=False)
+
 
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
     _TIME_LIMIT = 125
     _SSA_STATES_RAW = [0, 3, 13]
+
+
 #    _SSB_STATES_RAW = [0, 3]
 
 
@@ -284,6 +325,8 @@ class FrozenLake8x8(FrozenLakeABC):
     _GRID_SIZE = 8
     _TIME_LIMIT = 250
     _SSA_STATES_RAW = [0, 3, 5, 7, 24, 27, 31, 40, 43, 45, 47, 56, 61]
+
+
 #    _SSB_STATES_RAW = [0, 4, 7, 32, 36, 39, 56, 60]
 
 
@@ -295,6 +338,8 @@ class FrozenLake12x12(FrozenLakeABC):
         0, 5, 7, 11, 36, 43, 45, 47, 60, 63, 65, 67, 71, 84, 87, 89, 91, 93,
         95, 108, 111, 115, 119, 132, 137, 139, 141
     ]
+
+
 #    _SSB_STATES_RAW = []
 
 
