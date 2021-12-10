@@ -5,11 +5,11 @@ from itertools import cycle
 
 import numpy as np
 from gym.envs.registration import register
+from gym.envs.toy_text.discrete import DiscreteEnv
 from gym.envs.toy_text.frozen_lake import MAPS
 
 from .dimension import IntegerDimension
-from .environment import (TIME_LIMIT_MIN, EnvironmentABC,
-                          EnvironmentResponse)
+from .environment import TIME_LIMIT_MIN, EnvironmentABC, EnvironmentResponse
 from .obs_space import IntegerObsSpaceBuilder
 
 _PERF_LB = 0.0
@@ -114,6 +114,8 @@ class FrozenLakeABC(EnvironmentABC):
         self._x_y_obs_cache = self._make_x_y_obs_cache(self._GRID_SIZE)
         self._slip_prob = slip_prob
         self._alter_transition_func_if_needed(self._slip_prob)
+        self._inject_csprob_ns_into_wrapped(self._wrapped_env)
+
         self._iod_strat = iod_strat
         self._frozen_iter = iter(self._get_nonterminal_states_raw())
         self._frozen_cycler = cycle(self._get_nonterminal_states_raw())
@@ -177,6 +179,13 @@ class FrozenLakeABC(EnvironmentABC):
                     P_cell_mut = P_cell_raw
                 P_mut[state][action] = P_cell_mut
         self._wrapped_env.unwrapped.P = P_mut
+
+    def _inject_csprob_ns_into_wrapped(self, wrapped_env):
+        """Set csprob_ns attribute of wrapped gym DiscreteEnv *after transition
+        matrix P has been modified* by this wrapper."""
+        d_env = wrapped_env.unwrapped
+        assert isinstance(d_env, DiscreteEnv)
+        d_env.csprob_ns_with_idxs = d_env.gen_csprob_ns_with_idxs()
 
     def _get_nonterminal_states_raw(self):
         desc = self._wrapped_env.desc.flatten()
