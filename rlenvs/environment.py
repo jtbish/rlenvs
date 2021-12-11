@@ -157,7 +157,7 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         return obs_compt
 
     def step(self, action):
-        if self.is_terminal():
+        if self._is_terminal:
             raise EndOfEpisodeError("Environment is out of data (episode is "
                                     "finished). Call env.reset() to "
                                     "reinitialise for next episode.")
