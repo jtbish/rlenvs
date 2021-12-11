@@ -284,7 +284,7 @@ class FrozenLakeABC(EnvironmentABC):
 class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
-    _TIME_LIMIT = 125
+    _TIME_LIMIT = 150
     _SSA_STATES_RAW = [0, 3, 13]
 
 
@@ -294,7 +294,7 @@ class FrozenLake4x4(FrozenLakeABC):
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
-    _TIME_LIMIT = 250
+    _TIME_LIMIT = 300
     _SSA_STATES_RAW = [0, 3, 5, 7, 24, 27, 31, 40, 43, 45, 47, 56, 61]
 
 
@@ -304,7 +304,7 @@ class FrozenLake8x8(FrozenLakeABC):
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
-    _TIME_LIMIT = 375
+    _TIME_LIMIT = 450
     _SSA_STATES_RAW = [
         0, 5, 7, 11, 36, 43, 45, 47, 60, 63, 65, 67, 71, 84, 87, 89, 91, 93,
         95, 108, 111, 115, 119, 132, 137, 139, 141
@@ -317,4 +317,4 @@ class FrozenLake12x12(FrozenLakeABC):
 class FrozenLake16x16(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake16x16-v0"
     _GRID_SIZE = 16
-    _TIME_LIMIT = 500
+    _TIME_LIMIT = 600
