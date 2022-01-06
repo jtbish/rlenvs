@@ -17,7 +17,7 @@ _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
 _IOD_STRATS = ("top_left", "frozen_uniform_rand", "frozen_no_repeat",
                "frozen_repeat", "ssa_uniform_rand", "ssa_no_repeat",
-               "ssa_repeat")
+               "ssa_repeat", "ssb_uniform_rand", "ssb_no_repeat", "ssb_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
@@ -119,8 +119,21 @@ class FrozenLakeABC(EnvironmentABC):
         self._iod_strat = iod_strat
         self._frozen_iter = iter(self._get_nonterminal_states_raw())
         self._frozen_cycler = cycle(self._get_nonterminal_states_raw())
-        self._ssa_iter = iter(self._SSA_STATES_RAW)
-        self._ssa_cycler = cycle(self._SSA_STATES_RAW)
+
+        self._ssa_states_raw = [
+            self._convert_x_y_obs_to_raw(x_y_obs)
+            for x_y_obs in self._SSA_STATES_X_Y
+        ]
+        self._ssa_iter = iter(self._ssa_states_raw)
+        self._ssa_cycler = cycle(self._ssa_states_raw)
+
+        self._ssb_states_raw = [
+            self._convert_x_y_obs_to_raw(x_y_obs)
+            for x_y_obs in self._SSB_STATES_X_Y
+        ]
+        self._ssb_iter = iter(self._ssb_states_raw)
+        self._ssb_cycler = cycle(self._ssb_states_raw)
+
         self._si_size = self._calc_si_size(self._iod_strat)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
@@ -145,6 +158,12 @@ class FrozenLakeABC(EnvironmentABC):
         x = raw_obs % self._GRID_SIZE
         y = math.floor(raw_obs / self._GRID_SIZE)
         return np.asarray([x, y])
+
+    def _convert_x_y_obs_to_raw(self, x_y_obs):
+        (x, y) = x_y_obs
+        raw_obs = y * self._GRID_SIZE + x
+        assert 0 <= raw_obs <= (self._GRID_SIZE**2 - 1)
+        return raw_obs
 
     def _alter_transition_func_if_needed(self, slip_prob):
         if slip_prob > 0.0:
@@ -201,7 +220,9 @@ class FrozenLakeABC(EnvironmentABC):
         elif "frozen" in self._iod_strat:
             return len(self.nonterminal_states)
         elif "ssa" in self._iod_strat:
-            return len(self._SSA_STATES_RAW)
+            return len(self._ssa_states_raw)
+        elif "ssb" in self._iod_strat:
+            return len(self._ssb_states_raw)
         else:
             assert False
 
@@ -223,11 +244,17 @@ class FrozenLakeABC(EnvironmentABC):
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
         elif self._iod_strat == "ssa_uniform_rand":
-            return self._iod_rng.choice(self._SSA_STATES_RAW)
+            return self._iod_rng.choice(self._ssa_states_raw)
         elif self._iod_strat == "ssa_no_repeat":
             return next(self._ssa_iter)
         elif self._iod_strat == "ssa_repeat":
             return next(self._ssa_cycler)
+        elif self._iod_strat == "ssb_uniform_rand":
+            return self._iod_rng.choice(self._ssb_states_raw)
+        elif self._iod_strat == "ssb_no_repeat":
+            return next(self._ssb_iter)
+        elif self._iod_strat == "ssb_repeat":
+            return next(self._ssb_cycler)
         else:
             assert False
 
@@ -285,33 +312,48 @@ class FrozenLake4x4(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake-v0"
     _GRID_SIZE = 4
     _TIME_LIMIT = 150
-    _SSA_STATES_RAW = [0, 3, 13]
 
+    _SSA_STATES_X_Y = [(0, 0), (0, 2), (1, 3), (2, 0), (2, 2)]
 
-#    _SSB_STATES_RAW = [0, 3]
+    _SSB_STATES_X_Y = [(0, 0), (1, 2), (2, 1), (3, 0)]
 
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
     _TIME_LIMIT = 300
-    _SSA_STATES_RAW = [0, 3, 5, 7, 24, 27, 31, 40, 43, 45, 47, 56, 61]
 
+    _SSA_STATES_X_Y = [(0, 0), (0, 2), (0, 4), (0, 6), (1, 1), (1, 3), (1, 7),
+                       (2, 0), (2, 2), (2, 4), (2, 6), (3, 1), (3, 3), (3, 5),
+                       (4, 0), (4, 2), (4, 4), (5, 1), (5, 5), (5, 7), (6, 0),
+                       (6, 2), (6, 4), (7, 1), (7, 3), (7, 5)]
 
-#    _SSB_STATES_RAW = [0, 4, 7, 32, 36, 39, 56, 60]
+    _SSB_STATES_X_Y = [(0, 2), (0, 5), (1, 1), (1, 4), (1, 7), (2, 0), (2, 3),
+                       (2, 6), (3, 5), (4, 1), (4, 4), (4, 7), (5, 0), (5, 6),
+                       (6, 2), (7, 1), (7, 4)]
 
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 450
-    _SSA_STATES_RAW = [
-        0, 5, 7, 11, 36, 43, 45, 47, 60, 63, 65, 67, 71, 84, 87, 89, 91, 93,
-        95, 108, 111, 115, 119, 132, 137, 139, 141
-    ]
 
+    _SSA_STATES_X_Y = [(0, 0), (0, 2), (0, 4), (0, 6), (0, 8), (0, 10), (1, 1),
+                       (1, 3), (1, 5), (1, 7), (1, 9), (1, 11), (2, 0), (2, 4),
+                       (2, 6), (2, 8), (2, 10), (3, 1), (3, 5), (3, 7), (3, 9),
+                       (4, 0), (4, 4), (4, 6), (4, 8), (5, 5), (5, 7), (5, 11),
+                       (6, 0), (6, 2), (6, 6), (6, 8), (6, 10), (7, 1), (7, 3),
+                       (7, 5), (7, 7), (7, 9), (7, 11), (8, 0), (8, 2), (8, 6),
+                       (8, 8), (9, 3), (9, 7), (9, 11), (10, 0), (10, 2),
+                       (10, 4), (10, 6), (10, 8), (10, 10), (11, 1), (11, 3),
+                       (11, 5), (11, 7), (11, 9)]
 
-#    _SSB_STATES_RAW = []
+    _SSB_STATES_X_Y = [(0, 4), (0, 7), (0, 10), (1, 0), (1, 3), (1, 9), (2, 5),
+                       (2, 8), (2, 11), (3, 1), (3, 4), (3, 7), (3, 10),
+                       (4, 0), (4, 3), (4, 6), (4, 9), (5, 2), (5, 5), (5, 11),
+                       (6, 1), (6, 7), (6, 10), (7, 0), (7, 3), (7, 6), (7, 9),
+                       (8, 2), (8, 5), (8, 8), (9, 4), (9, 7), (10, 0),
+                       (10, 3), (10, 6), (10, 9), (11, 2), (11, 5), (11, 8)]
 
 
 class FrozenLake16x16(FrozenLakeABC):
