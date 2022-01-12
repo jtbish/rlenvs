@@ -313,8 +313,8 @@ class FrozenLake4x4(FrozenLakeABC):
     _GRID_SIZE = 4
     _TIME_LIMIT = 150
 
-    _SSA_STATES_X_Y = [(0, 0), (1, 3), (2, 2), (3, 0)]
-    _SSB_STATES_X_Y = [(0, 0), (3, 0)]
+    _SSA_STATES_X_Y = [(0, 0), (3, 0)]
+    _SSB_STATES_X_Y = [(0, 0), (1, 3), (2, 2), (3, 0)]
 
 
 class FrozenLake8x8(FrozenLakeABC):
@@ -322,9 +322,9 @@ class FrozenLake8x8(FrozenLakeABC):
     _GRID_SIZE = 8
     _TIME_LIMIT = 300
 
-    _SSA_STATES_X_Y = [(0, 0), (0, 4), (0, 7), (1, 2), (2, 6), (4, 3), (4, 7),
+    _SSA_STATES_X_Y = [(0, 0), (0, 7), (4, 7), (7, 0)]
+    _SSB_STATES_X_Y = [(0, 0), (0, 4), (0, 7), (1, 2), (2, 6), (4, 3), (4, 7),
                        (5, 1), (7, 0), (7, 3)]
-    _SSB_STATES_X_Y = [(0, 0), (0, 7), (4, 7), (7, 0)]
 
 
 class FrozenLake12x12(FrozenLakeABC):
@@ -332,12 +332,12 @@ class FrozenLake12x12(FrozenLakeABC):
     _GRID_SIZE = 12
     _TIME_LIMIT = 450
 
-    _SSA_STATES_X_Y = [(0, 0), (0, 3), (0, 8), (0, 11), (2, 6), (2, 10),
+    _SSA_STATES_X_Y = [(0, 0), (0, 11), (3, 2), (4, 0), (4, 3), (4, 11),
+                       (5, 2), (9, 11), (11, 0)]
+    _SSB_STATES_X_Y = [(0, 0), (0, 3), (0, 8), (0, 11), (2, 6), (2, 10),
                        (3, 2), (4, 0), (4, 3), (4, 11), (5, 2), (5, 5), (7, 0),
                        (7, 4), (7, 10), (8, 8), (9, 11), (10, 4), (10, 9),
                        (11, 0), (11, 7)]
-    _SSB_STATES_X_Y = [(0, 0), (0, 11), (3, 2), (4, 0), (4, 3), (4, 11),
-                       (5, 2), (9, 11), (11, 0)]
 
 
 class FrozenLake16x16(FrozenLakeABC):
