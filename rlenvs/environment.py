@@ -199,6 +199,9 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
     def reseed_iod_rng(self, new_seed):
         self._iod_rng = self._make_iod_rng(new_seed)
 
+    def reseed_wrapped_rng(self, new_seed):
+        self._wrapped_env.seed(new_seed)
+
 
 def assess_perf(env, policy, num_rollouts, gamma):
     assert _GAMMA_MIN <= gamma <= _GAMMA_MAX
