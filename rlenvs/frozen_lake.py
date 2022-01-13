@@ -16,8 +16,7 @@ _PERF_LB = 0.0
 _SLIP_PROB_MIN_INCL = 0.0
 _SLIP_PROB_MAX_EXCL = 1.0
 _IOD_STRATS = ("top_left", "frozen_uniform_rand", "frozen_no_repeat",
-               "frozen_repeat", "ssa_uniform_rand", "ssa_no_repeat",
-               "ssa_repeat", "ssb_uniform_rand", "ssb_no_repeat", "ssb_repeat")
+               "frozen_repeat")
 _TOP_LEFT_OBS_RAW = 0
 # used when registering envs then overwritten later
 _DUMMY_MAX_EP_STEPS = TIME_LIMIT_MIN
@@ -120,20 +119,6 @@ class FrozenLakeABC(EnvironmentABC):
         self._frozen_iter = iter(self._get_nonterminal_states_raw())
         self._frozen_cycler = cycle(self._get_nonterminal_states_raw())
 
-        self._ssa_states_raw = [
-            self._convert_x_y_obs_to_raw(x_y_obs)
-            for x_y_obs in self._SSA_STATES_X_Y
-        ]
-        self._ssa_iter = iter(self._ssa_states_raw)
-        self._ssa_cycler = cycle(self._ssa_states_raw)
-
-        self._ssb_states_raw = [
-            self._convert_x_y_obs_to_raw(x_y_obs)
-            for x_y_obs in self._SSB_STATES_X_Y
-        ]
-        self._ssb_iter = iter(self._ssb_states_raw)
-        self._ssb_cycler = cycle(self._ssb_states_raw)
-
         self._si_size = self._calc_si_size(self._iod_strat)
 
     def _gen_x_y_coordinates_obs_space(self, grid_size):
@@ -219,10 +204,6 @@ class FrozenLakeABC(EnvironmentABC):
             return 1
         elif "frozen" in self._iod_strat:
             return len(self.nonterminal_states)
-        elif "ssa" in self._iod_strat:
-            return len(self._ssa_states_raw)
-        elif "ssb" in self._iod_strat:
-            return len(self._ssb_states_raw)
         else:
             assert False
 
@@ -243,18 +224,6 @@ class FrozenLakeABC(EnvironmentABC):
             return next(self._frozen_iter)
         elif self._iod_strat == "frozen_repeat":
             return next(self._frozen_cycler)
-        elif self._iod_strat == "ssa_uniform_rand":
-            return self._iod_rng.choice(self._ssa_states_raw)
-        elif self._iod_strat == "ssa_no_repeat":
-            return next(self._ssa_iter)
-        elif self._iod_strat == "ssa_repeat":
-            return next(self._ssa_cycler)
-        elif self._iod_strat == "ssb_uniform_rand":
-            return self._iod_rng.choice(self._ssb_states_raw)
-        elif self._iod_strat == "ssb_no_repeat":
-            return next(self._ssb_iter)
-        elif self._iod_strat == "ssb_repeat":
-            return next(self._ssb_cycler)
         else:
             assert False
 
@@ -313,31 +282,17 @@ class FrozenLake4x4(FrozenLakeABC):
     _GRID_SIZE = 4
     _TIME_LIMIT = 150
 
-    _SSA_STATES_X_Y = [(0, 0), (3, 0)]
-    _SSB_STATES_X_Y = [(0, 0), (1, 3), (2, 2), (3, 0)]
-
 
 class FrozenLake8x8(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake8x8-v0"
     _GRID_SIZE = 8
     _TIME_LIMIT = 300
 
-    _SSA_STATES_X_Y = [(0, 0), (0, 7), (4, 7), (7, 0)]
-    _SSB_STATES_X_Y = [(0, 0), (0, 4), (0, 7), (1, 2), (2, 6), (4, 3), (4, 7),
-                       (5, 1), (7, 0), (7, 3)]
-
 
 class FrozenLake12x12(FrozenLakeABC):
     _GYM_ENV_NAME = "FrozenLake12x12-v0"
     _GRID_SIZE = 12
     _TIME_LIMIT = 450
-
-    _SSA_STATES_X_Y = [(0, 0), (0, 11), (3, 2), (4, 0), (4, 3), (4, 11),
-                       (5, 2), (9, 11), (11, 0)]
-    _SSB_STATES_X_Y = [(0, 0), (0, 3), (0, 8), (0, 11), (2, 6), (2, 10),
-                       (3, 2), (4, 0), (4, 3), (4, 11), (5, 2), (5, 5), (7, 0),
-                       (7, 4), (7, 10), (8, 8), (9, 11), (10, 4), (10, 9),
-                       (11, 0), (11, 7)]
 
 
 class FrozenLake16x16(FrozenLakeABC):
