@@ -1,19 +1,25 @@
 import numpy as np
 
 from .dimension import RealDimension
-from .environment import EnvironmentABC, EnvironmentResponse
+from .environment import EnvironmentResponse
 from .obs_space import RealObsSpace, RealObsSpaceBuilder
 
 _OBS_DIM_LOWER = 0.0
 _OBS_DIM_UPPER = 1.0
 
 
-class NormaliseWrapper(EnvironmentABC):
+class NormaliseWrapper:
     """Wrapper over EnvironmentABC derived class that uses a real obs space to
     min-max normalise all observations between [0, 1]."""
     def __init__(self, wrapped):
         assert isinstance(wrapped.obs_space, RealObsSpace)
         self._wrapped = wrapped
+
+        self._dim_lowers_arr = np.asarray(
+            [dim.lower for dim in self._wrapped.obs_space])
+        self._dim_spans_arr = np.asarray(
+            [dim.span for dim in self._wrapped.obs_space])
+
         self._unit_hypercube_obs_space = \
             self._gen_unit_hypercube_obs_space(self._wrapped.obs_space)
 
@@ -25,20 +31,12 @@ class NormaliseWrapper(EnvironmentABC):
         return builder.create_space()
 
     def _normalise_wrapped_obs(self, wrapped_obs):
-        normalised = []
-        for (obs_compt, dim) in zip(wrapped_obs, self._wrapped.obs_space):
-            new_val = (obs_compt - dim.lower) / dim.span
-            assert _OBS_DIM_LOWER <= new_val <= _OBS_DIM_UPPER
-            normalised.append(new_val)
-        return np.array(normalised)
+        # numpy arr ops faster than for loop
+        return (wrapped_obs - self._dim_lowers_arr) / self._dim_spans_arr
 
     @property
     def perf_lower_bound(self):
         return self._wrapped.perf_lower_bound
-
-    def _sample_initial_obs(self):
-        # don't need to normalise initial obss since only used internally
-        return self._wrapped._sample_initial_obs()
 
     @property
     def time_limit(self):
@@ -46,7 +44,7 @@ class NormaliseWrapper(EnvironmentABC):
 
     @property
     def obs_space(self):
-        """Use non-wrapped obs space!"""
+        """Override: use non-wrapped obs space."""
         return self._unit_hypercube_obs_space
 
     @property
@@ -73,3 +71,6 @@ class NormaliseWrapper(EnvironmentABC):
 
     def reseed_iod_rng(self, new_seed):
         self._wrapped.reseed_iod_rng(new_seed)
+
+    def reseed_wrapped_rng(self, new_seed):
+        self._wrapped.reseed_wrapped_rng(new_seed)

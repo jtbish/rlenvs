@@ -143,18 +143,12 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         if np.isscalar(obs):
             assert len(self._obs_space) == 1
             dim = self._obs_space.dims[0]
-            return self._clip_obs_compt(obs_compt=obs, dim=dim)
+            return np.clip(obs, dim.lower, dim.upper)
         else:
             truncated_obs = []
             for (obs_compt, dim) in zip(obs, self._obs_space):
-                obs_compt = self._clip_obs_compt(obs_compt, dim)
-                truncated_obs.append(obs_compt)
+                truncated_obs.append(np.clip(obs_compt, dim.lower, dim.upper))
             return np.asarray(truncated_obs)
-
-    def _clip_obs_compt(self, obs_compt, dim):
-        obs_compt = max(obs_compt, dim.lower)
-        obs_compt = min(obs_compt, dim.upper)
-        return obs_compt
 
     def step(self, action):
         if self._is_terminal:
@@ -203,13 +197,17 @@ class EnvironmentABC(metaclass=abc.ABCMeta):
         self._wrapped_env.seed(new_seed)
 
 
-def assess_perf(env, policy, num_rollouts, gamma):
+def assess_perf(env, policy, num_rollouts, gamma, return_trajs=False):
     assert _GAMMA_MIN <= gamma <= _GAMMA_MAX
     assert num_rollouts >= _NUM_ROLLOUTS_MIN
     # make copy of env for perf assessment so rng state is not modified
     # across assessments
     env = copy.deepcopy(env)
-    return _assess_perf(env, policy, num_rollouts, gamma)
+
+    if return_trajs:
+        return _assess_perf_and_return_trajs(env, policy, num_rollouts, gamma)
+    else:
+        return _assess_perf(env, policy, num_rollouts, gamma)
 
 
 def _assess_perf(env, policy, num_rollouts, gamma):
@@ -245,3 +243,50 @@ def _assess_perf(env, policy, num_rollouts, gamma):
                                   time_steps_used=time_steps_used,
                                   time_limit_trunced=time_limit_trunced,
                                   failed=False)
+
+
+def _assess_perf_and_return_trajs(env, policy, num_rollouts, gamma):
+    time_steps_used = 0
+    returns = []
+    trajs = []
+    time_limit_trunced = False
+
+    for _ in range(num_rollouts):
+        obs = env.reset()
+        return_ = 0.0
+        traj = []
+        time_step = 0
+        while True:
+            action = policy.select_action(obs)
+            traj.append((obs, action))
+
+            if action == NULL_ACTION:
+                perf_assess_response = PerfAssessmentResponse(
+                    perf=env.perf_lower_bound,
+                    time_steps_used=time_steps_used,
+                    time_limit_trunced=time_limit_trunced,
+                    failed=True)
+                # add the curr. traj to trajs
+                trajs.append(traj)
+                return (perf_assess_response, trajs)
+
+            env_response = env.step(action)
+            time_limit_trunced = time_limit_trunced or \
+                env_response.info.get("TimeLimit.truncated", False)
+            obs = env_response.obs
+            return_ += ((gamma**time_step) * env_response.reward)
+            time_step += 1
+            time_steps_used += 1
+            if env_response.is_terminal:
+                break
+
+        returns.append(return_)
+        trajs.append(traj)
+
+    expected_return = np.mean(returns)
+    perf_assess_response = PerfAssessmentResponse(
+        perf=expected_return,
+        time_steps_used=time_steps_used,
+        time_limit_trunced=time_limit_trunced,
+        failed=False)
+    return (perf_assess_response, trajs)

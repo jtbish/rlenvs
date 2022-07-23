@@ -16,6 +16,9 @@ class ObsSpaceBase:
     def __len__(self):
         return len(self._dims)
 
+    def __getitem__(self, idx):
+        return self._dims[idx]
+
 
 class IntegerObsSpace(ObsSpaceBase):
     pass
