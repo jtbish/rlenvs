@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import qmc
 
 from .dimension import RealDimension
 from .environment import EnvironmentABC
@@ -25,13 +26,13 @@ _NUM_OBS_DIMS = 4
 # pole_vel max = 3.336540969818183
 # Note these bounds were approximately symmetric around zero s.t. the mins were
 # negatives of these.
-# Then, we simply just rounded these up to a "nice" decimal value to give
-# conservative upper bounds, i.e:
-# 2.197468937556396 -> 2.25
-# 3.336540969818183 -> 3.5
+# Then, we simply just rounded these up to nearest tenth decimal value to
+# create upper bounds, i.e:
+# 2.197468937556396 -> 2.2
+# 3.336540969818183 -> 3.4
 
-_MAX_CART_VEL = 2.25
-_MAX_POLE_VEL = 3.5
+_MAX_CART_VEL = 2.2
+_MAX_POLE_VEL = 3.4
 
 _CART_VEL_LOWER = -(_MAX_CART_VEL)
 _CART_VEL_UPPER = _MAX_CART_VEL
@@ -44,7 +45,7 @@ _MAX_POLE_ANG_RADIANS = 12 * (np.pi / 180)  # from gym env source code
 _POLE_ANG_LOWER = -(_MAX_POLE_ANG_RADIANS)
 _POLE_ANG_UPPER = _MAX_POLE_ANG_RADIANS
 
-_IOD_STRATS = ("center_uniform_rand", "center_no_repeat",
+_IOD_STRATS = ("dummy", "center_uniform_rand", "center_no_repeat",
                "cover_sample_uniform_rand", "cover_sample_no_repeat")
 
 _TIME_LIMIT = 200
@@ -54,22 +55,32 @@ _PERF_LB = 0
 _CENTER_OBS_VAL_HIGH = 0.05
 _CENTER_OBS_VAL_LOW = -(_CENTER_OBS_VAL_HIGH)
 
-_COVER_BOUND_MULT = 0.5
+# Maximal hypervolume symmetrical box around the origin for 100 bins per dim
+# value function, that contains only maximum values of 200.
+# Empirically determined via brute force search.
+# ((20, 79), (0, 99), (16, 83), (32, 67))
 
-_COVER_CART_POS_HIGH = (_COVER_BOUND_MULT * _CART_POS_UPPER)
+_NUM_BINS_HALF_DIM = 50  # i.e. 100/2
+
+_COVER_CART_POS_MULT = ((79 - _NUM_BINS_HALF_DIM + 1) / _NUM_BINS_HALF_DIM)
+_COVER_CART_POS_HIGH = (_COVER_CART_POS_MULT * _CART_POS_UPPER)
 _COVER_CART_POS_LOW = -(_COVER_CART_POS_HIGH)
 
-_COVER_CART_VEL_HIGH = (_COVER_BOUND_MULT * _CART_VEL_UPPER)
+_COVER_CART_VEL_MULT = ((99 - _NUM_BINS_HALF_DIM + 1) / _NUM_BINS_HALF_DIM)
+_COVER_CART_VEL_HIGH = (_COVER_CART_VEL_MULT * _CART_VEL_UPPER)
 _COVER_CART_VEL_LOW = -(_COVER_CART_VEL_HIGH)
 
-_COVER_POLE_ANG_HIGH = (_COVER_BOUND_MULT * _POLE_ANG_UPPER)
+_COVER_POLE_ANG_MULT = ((83 - _NUM_BINS_HALF_DIM + 1) / _NUM_BINS_HALF_DIM)
+_COVER_POLE_ANG_HIGH = (_COVER_POLE_ANG_MULT * _POLE_ANG_UPPER)
 _COVER_POLE_ANG_LOW = -(_COVER_POLE_ANG_HIGH)
 
-_COVER_POLE_VEL_HIGH = (_COVER_BOUND_MULT * _POLE_VEL_UPPER)
+_COVER_POLE_VEL_MULT = ((67 - _NUM_BINS_HALF_DIM + 1) / _NUM_BINS_HALF_DIM)
+_COVER_POLE_VEL_HIGH = (_COVER_POLE_VEL_MULT * _POLE_VEL_UPPER)
 _COVER_POLE_VEL_LOW = -(_COVER_POLE_VEL_HIGH)
 
 NUM_CENTER_SAMPLES = 30
-NUM_COVER_SAMPLES = 100
+# must be a power of 2
+NUM_COVER_SAMPLES = 128
 
 
 def make_cartpole_env(iod_strat, normalise=False, seed=_DEFAULT_SEED):
@@ -91,19 +102,26 @@ class Cartpole(EnvironmentABC):
                          seed=seed)
         self._iod_strat = iod_strat
 
-        if self._iod_strat == "center_no_repeat":
+        if self._iod_strat == "dummy":
+            self._dummy_init_obs = np.zeros(len(custom_obs_space))
+
+        elif self._iod_strat == "center_no_repeat":
             self._center_states_iter = iter(self._gen_center_states())
 
         elif self._iod_strat == "cover_sample_no_repeat":
             self._cover_sample_states_iter = \
-                iter(self._gen_cover_sample_states())
+                iter(self._gen_cover_sample_states(seed=seed))
 
     @property
     def perf_lower_bound(self):
         return _PERF_LB
 
     def _sample_initial_obs(self):
-        if self._iod_strat == "center_uniform_rand":
+        if self._iod_strat == "dummy":
+
+            return self._dummy_init_obs
+
+        elif self._iod_strat == "center_uniform_rand":
 
             return self._iod_rng.uniform(low=_CENTER_OBS_VAL_LOW,
                                          high=_CENTER_OBS_VAL_HIGH,
@@ -153,16 +171,27 @@ class Cartpole(EnvironmentABC):
 
         return [_gen_state() for _ in range(NUM_CENTER_SAMPLES)]
 
-    def _gen_cover_sample_states(self):
-        def _gen_state():
-            cart_pos = self._iod_rng.uniform(low=_COVER_CART_POS_LOW,
-                                             high=_COVER_CART_POS_HIGH)
-            cart_vel = self._iod_rng.uniform(low=_COVER_CART_VEL_LOW,
-                                             high=_COVER_CART_VEL_HIGH)
-            pole_ang = self._iod_rng.uniform(low=_COVER_POLE_ANG_LOW,
-                                             high=_COVER_POLE_ANG_HIGH)
-            pole_vel = self._iod_rng.uniform(low=_COVER_POLE_VEL_LOW,
-                                             high=_COVER_POLE_VEL_HIGH)
-            return np.asarray([cart_pos, cart_vel, pole_ang, pole_vel])
+    def _gen_cover_sample_states(self, seed):
+        sobol_sampler = qmc.Sobol(d=_NUM_OBS_DIMS, scramble=True, seed=seed)
+        # n = 2^m
+        m = np.log2(NUM_COVER_SAMPLES)
+        assert m.is_integer()  # i.e. n is a power of 2
+        m = int(m)
 
-        return [_gen_state() for _ in range(NUM_COVER_SAMPLES)]
+        # do sobol sample in unit hypercube then scale it for the cover box
+        sobol_sample_unit_hypercube = sobol_sampler.random_base2(m)
+        cover_l_bounds = np.asarray([
+            _COVER_CART_POS_LOW, _COVER_CART_VEL_LOW, _COVER_POLE_ANG_LOW,
+            _COVER_POLE_VEL_LOW
+        ])
+        cover_u_bounds = np.asarray([
+            _COVER_CART_POS_HIGH, _COVER_CART_VEL_HIGH, _COVER_POLE_ANG_HIGH,
+            _COVER_POLE_VEL_HIGH
+        ])
+        sobol_sample_cover = \
+            qmc.scale(sobol_sample_unit_hypercube, l_bounds=cover_l_bounds,
+                      u_bounds=cover_u_bounds, reverse=False)
+
+        sobol_sample_cover = list(sobol_sample_cover)
+        assert len(sobol_sample_cover) == NUM_COVER_SAMPLES
+        return sobol_sample_cover

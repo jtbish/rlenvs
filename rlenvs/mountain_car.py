@@ -17,7 +17,7 @@ _CUSTOM_ACTION_SPACE = (_LEFT_ACTION, _RIGHT_ACTION)
 _PERF_LB = -200
 # "bottom_zero_vel" for backwards compatability
 # "cover_grid_uniform_rand" is alias for "uniform_rand"
-_IOD_STRATS = ("bottom_zero_vel", "bottom_zero_vel_uniform_rand",
+_IOD_STRATS = ("dummy", "bottom_zero_vel", "bottom_zero_vel_uniform_rand",
                "bottom_zero_vel_no_repeat", "cover_grid_uniform_rand",
                "cover_grid_no_repeat", "uniform_rand")
 _TIME_LIMIT = 200
@@ -46,7 +46,10 @@ class MountainCar(EnvironmentABC):
                          seed=seed)
         self._iod_strat = iod_strat
 
-        if self._iod_strat == "bottom_zero_vel_no_repeat":
+        if self._iod_strat == "dummy":
+            self._dummy_init_obs = np.zeros(len(custom_obs_space))
+
+        elif self._iod_strat == "bottom_zero_vel_no_repeat":
             self._bottom_zero_vel_states_iter = \
                 iter(self._gen_bottom_zero_vel_states())
 
@@ -85,8 +88,12 @@ class MountainCar(EnvironmentABC):
         return res
 
     def _sample_initial_obs(self):
-        if self._iod_strat in ("bottom_zero_vel",
-                               "bottom_zero_vel_uniform_rand"):
+        if self._iod_strat == "dummy":
+
+            return self._dummy_init_obs
+
+        elif self._iod_strat in ("bottom_zero_vel",
+                                 "bottom_zero_vel_uniform_rand"):
 
             pos = self._iod_rng.uniform(low=-0.6, high=-0.4)
             vel = 0.0
